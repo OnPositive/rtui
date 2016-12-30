@@ -1,6 +1,6 @@
 declare var require: any
-require("../../lib/bootstrap-contextmenu")
-require("../../lib/bootstrap-treeview")
+require("../lib/bootstrap-contextmenu")
+require("../lib/bootstrap-treeview")
 
 export interface IControl{
     render(e:Element);

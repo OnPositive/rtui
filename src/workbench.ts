@@ -26,7 +26,7 @@ import {IControl, Label} from "./controls";
 declare var require: any
 
 
-var Split: (a, b)=>void = require("../../lib/Split").Split
+var Split: (a, b)=>void = require("../lib/Split").Split
 
 export class LayoutPart implements ILayoutPart {
 
