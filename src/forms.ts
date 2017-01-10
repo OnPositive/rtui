@@ -1,16 +1,11 @@
 import controls=require("./controls");
+
+import tps=require("raml-type-bindings")
+import IBinding=tps.IBinding
+import IPropertyGroup=tps.ts.IPropertyGroup;
 import wb=require("./workbench");
 import {IControl, Label, Composite, WrapComposite, VerticalFlex} from "./controls";
-import {PropertyDescription, PropertyGroup,groupProps,collapseInnerProps} from "./properties";
 
-export enum Severity{
-    OK, WARNING, ERROR
-}
-
-export class Status {
-    sev: Severity
-    message: string
-}
 
 export class Form extends controls.Composite {
     constructor() {
@@ -19,6 +14,7 @@ export class Form extends controls.Composite {
         this._style.width = "100%"
     }
 }
+
 export class TabFolder extends controls.WrapComposite{
 
     constructor(){
@@ -72,6 +68,7 @@ export class InputGroup extends controls.Composite {
         this.addClassName("input-group-sm");
         this._style.padding = "5px";
     }
+    weapperForChild:boolean=true;
 }
 
 export class InputGroupAddOn extends controls.Composite {
@@ -82,22 +79,75 @@ export class InputGroupAddOn extends controls.Composite {
     }
 }
 
+
+
 export abstract class BindableControl extends controls.Composite {
-    _binding: IBinding
+    _binding: tps.IBinding
+
+
+    valListener:tps.IValueListener;
+
+    protected updateVisibility(){
+        var m:tps.metakeys.VisibleWhen&tps.metakeys.DisabledWhen=this._binding.type();
+        var visible=true;
+        if (m.visibleWhen){
+            visible=visible&&tps.calcCondition(m.visibleWhen,this._binding);
+        }
+        if (m.hiddenWhen){
+            visible=visible&&!tps.calcCondition(m.hiddenWhen,this._binding)
+        }
+        this.setVisible(visible);
+        var disabled=false;
+        if (m.disabledWhen){
+            disabled=tps.calcCondition(m.disabledWhen,this._binding);
+        }
+        this.setDisabled(disabled);
+        return;
+    }
+
+
+
 
     protected renderContent(ch: HTMLElement) {
         super.renderContent(ch);
+        var vv=this;
+        if (!this.valListener){
+            this.valListener={
+                valueChanged(){
+                    vv.updateVisibility();
+                }
+            }
+        }
         this.initBinding(ch);
+
     }
 
     protected abstract initBinding(ch: HTMLElement);
 
+    afterCreate?:(c:BindableControl)=>void
+
+    onAttach(e:Element){
+        if (this.afterCreate){
+            this.afterCreate(this)
+        }
+        if (this._binding){
+            var m:tps.metakeys.VisibleWhen&tps.metakeys.DisabledWhen&tps.metakeys.EnumValues&tps.metakeys.TypeAhead=this._binding.type();
+            if (m.visibleWhen||m.hiddenWhen||m.disabledWhen||m.enumValues||m.typeahead){
+                this._binding.root().addListener(this.valListener);
+                this.updateVisibility();
+            }
+        }
+    }
+    onDetach(e:Element){
+        this._binding.root().removeListener(this.valListener);
+    }
 }
 
 export class Input extends BindableControl {
     constructor() {
         super("input")
         this.addClassName("form-control");
+
     }
 
     protected initBinding(ch: HTMLElement) {
@@ -107,8 +157,24 @@ export class Input extends BindableControl {
             if (!val) {
                 val = "";
             }
+            if (tps.service.isNumber(this._binding.type())){
+                this._element.setAttribute("type","number");
+                var mm:tps.NumberType=this._binding.type();
+                if (mm.maximum){
+                    this._element.setAttribute("maximum",""+mm.maximum);
+
+                }
+                if (mm.minimum){
+                    this._element.setAttribute("minimum",""+mm.minimum);
+                }
+                if (mm.step){
+                    this._element.setAttribute("step",""+mm.step);
+                }
+            }
+
             el.value = val;
             el.onkeyup = (e)=> {
+
                 this._binding.set(el.value);
             }
         }
@@ -119,6 +185,7 @@ export class TextArea extends BindableControl {
         super("textarea")
         this.addClassName("form-control");
     }
+
 
     protected initBinding(ch: HTMLElement) {
         var el: HTMLInputElement = <HTMLInputElement>ch;
@@ -154,50 +221,278 @@ export class Help extends controls.Composite {
         this.attrs.title = value;
     }
 }
+function enumValues(b:IBinding):any[]{
+    var enumv=b.type().enum;
+    if (!enumv){
+        var enumF=(<tps.metakeys.EnumValues>b.type()).enumValues;
+        enumv=tps.calcExpression(enumF,b);
+        if (!Array.isArray(enumv)){
+            if (typeof enumv=="object"){
+                enumv=Object.keys(enumv);
+            }
+        }
+    }
+
+    if (!enumv){
+        enumv=[]
+    }
+    return enumv;
+}
+
+class EnumInfo{
+    labelsMap = new Map<string,any>();
+    values:any[]=[]
+    labels:any[]=[]
+    selectedIndex:number=0;
+    value: string
+    constructor(private b:IBinding){
+        var enumv:any[]=enumValues(b);
+        var vl=b.get();
+        var needCommit=(!vl)&&b.type().required;
+        if (needCommit&&enumv.length>0){
+            vl=enumv[0];
+            b.set(vl);
+        }
+        const hasDescriptions: tps.metakeys.EnumDescriptions = <any>b.type();
+        for (var i = 0; i < enumv.length; i++) {
+            var lab = enumv[i];
+            var val = lab;
+            if (hasDescriptions.enumDescriptions) {
+                val = hasDescriptions.enumDescriptions[i];
+            }
+            else {
+                if (typeof lab != "string") {
+                    val = tps.service.label(lab, b.type());
+                }
+            }
+            if (val===b.get()){
+                this.selectedIndex=(i+(b.type().required?0:1));
+            }
+            this.labelsMap.set(val, lab);
+            this.labels.push(val);
+        }
+        if (!b.type().required) {
+            this.labels.push('');
+            this.labelsMap.set('', '');
+            if (!vl||this.labels.indexOf(vl)==-1){
+                vl="";
+                b.set("");
+            }
+        }
+        else{
+            if (enumv.indexOf(vl)==-1){
+                this.b.set("");
+            }
+        }
+        this.values=enumv;
+    }
+}
+
+
 export class Select extends BindableControl {
     constructor() {
         super("select")
-        //this.attrs.type="select";
         this.addClassName("form-control");
     }
+    selectInited:boolean
+    enumOptions:string[]
 
+    protected updateVisibility(){
+        super.updateVisibility();
+        var enumF=(<tps.metakeys.EnumValues>this._binding.type()).enumValues;
+        if (enumF){
+            var enumv=tps.calcExpression(enumF,this._binding);
+            if (JSON.stringify(this.enumOptions)!=JSON.stringify(enumv)){
+                this.selectInited=false;
+                if (this._element) {
+                    this.initBinding(<HTMLElement>this._element);
+                }
+            }
+        }
+    }
     protected initBinding(ch: HTMLElement) {
         var el: HTMLSelectElement = <HTMLSelectElement>ch;
         if (this._binding) {
-            el.value = this._binding.get();
-            el.onchange = (e)=> {
-                this._binding.set(el.value);
+            if (!this.selectInited) {
+                var info=new EnumInfo(this._binding)
+                this.enumOptions=[].concat(info.values);
+                el.onchange = (e) => {
+                    this._binding.set(info.labelsMap.get(el.value));
+                }
+                this.children = [];
+                info.labels.forEach(x => {
+                    this.children.push(new Option(x))
+                })
+                this.selectInited=true;
+                this.refresh();
+                el.selectedIndex=info.selectedIndex;
             }
         }
     }
 }
+export class RadioSelect extends BindableControl {
+    constructor() {
+        super("div")
+        this._style.padding="5px";
+    }
+    initBinding(){}
+
+    renderContent(e:HTMLElement){
+        super.renderContent(e);
+        var info=new EnumInfo(this._binding)
+        var mm=document.createElement("div");
+        mm.appendChild(document.createTextNode(this._binding.type().displayName));
+        var descr=this._binding.type().description;
+        if (descr){
+            var h=new Help(descr);
+            h._style.paddingLeft="2px"
+            h._style.paddingRight="2px"
+            h.render(mm);
+        }
+        mm.appendChild(document.createTextNode(':'));
+        e.appendChild(mm);
+        info.labels.forEach(x=>{
+            var input=document.createElement("input");
+            input.type="radio";
+            var vl=info.labelsMap.get(x);
+            input.onchange=(e)=>{this._binding.set(vl)};
+            input.name=(this._binding.id());
+            input.value=vl;
+            if (vl==this._binding.get()){
+                input.checked=true;
+            }
+            var lab=document.createElement("div")
+            lab.appendChild(input);
+            lab.appendChild(document.createTextNode(" "+x))
+            e.appendChild(lab);
+        });
+    }
+
+}
+
 export class Button extends controls.Composite {
     constructor(text: string) {
         super("button")
         //this.attrs.type="select";
         this.addClassName("form-control");
+        this.addClassName("btn")
+        this.addClassName("btn-default")
         this._text = text;
     }
 }
 
+export class StatusRender extends BindableControl implements tps.IValueListener{
 
+    valueChanged(e:tps.ChangeEvent){
+        this.processChanges();
+    }
 
-export class Toolbar extends controls.Composite {
+    constructor(){
+        super("div");
+    }
 
+    onAttach(e:Element){
+        super.onAttach(e)
+        if (this._binding){
+            this._binding.binding("$status").addListener(this);
+            this.processChanges();
+        }
+    }
+    private content:Element;
+    processChanges(){
+        var st:tps.Status=this._binding.binding("$status").get();
+        if (!this.content){
+            var sp=document.createElement("span");
+            this.content=sp;
+            this._element.appendChild(sp);
+        }
+        if (st.severity==tps.Severity.ERROR){
+            var msg=new controls.ErrorMessage();
+            msg._message=st.message;
+            msg.render(this.content);
+        }
+        else{
+            this.content.innerHTML="";
+        }
+    }
+    onDetach(e:Element){
+        super.onDetach(e)
+        if (this._binding){
+            this._binding.binding("$status").removeListener(this);
+        }
+    }
+
+    protected initBinding(ch: HTMLElement) {
+    }
+}
+
+export abstract class ActionPresenter extends controls.Composite implements IValueListener{
     items: controls.IContributionItem[] = []
+
+    onAttach(){
+        this.items.forEach(i=>{
+            var ls=<ListenableAction>i;
+            if (ls.addListener){
+                ls.addListener(this);
+            }
+        })
+    }
+    valueChanged(c:ChangeEvent){
+        this._element.innerHTML="";
+        this.renderElement(<HTMLElement>this._element);
+
+    }
+    protected renderContent(ch: HTMLElement) {
+        super.renderContent(ch);
+        this.renderElement(ch);
+    }
+
+    abstract renderElement(e:HTMLElement);
+
+    onDetach(){
+        this.items.forEach(i=>{
+            var ls=<ListenableAction>i;
+            if (ls.removeListener){
+                ls.removeListener(this);
+            }
+        })
+    }
+}
+
+export class Toolbar extends ActionPresenter implements IValueListener{
 
     constructor() {
         super("span")
         this._styleString = "float: right";
     }
-
-    protected renderContent(ch: HTMLElement) {
-        super.renderContent(ch);
+    renderElement(e:HTMLElement){
         var rnd = new controls.ToolbarRenderer(<any>this);
         rnd.style.marginRight = "5px";
-        rnd.render(ch);
+        rnd.render(this._element);
     }
 }
+export class DropDown extends ActionPresenter implements IValueListener{
+
+    constructor() {
+        super("div")
+        this._styleString = "float: right";
+    }
+    onAttach(){
+        super.onAttach()
+        this.valueChanged(null);
+    }
+    renderElement(e:HTMLElement){
+        var id=this.id()+"menu"
+        e.innerHTML=`<ul class="dropdown-menu" id='${id}'role="menu" aria-labelledby="2"></ul>`;
+        new controls.DrowpdownMenu(<any>this).render(document.getElementById(id));
+    }
+    addTo(v:Composite){
+        v.attrs["data-target"]="#"+this.id();
+        v.attrs["data-toggle"]="context";
+        v._footer=this;
+    }
+}
+
 
 export class Section extends controls.Composite {
 
@@ -212,6 +507,32 @@ export class Section extends controls.Composite {
     add(c: IControl) {
         this.body.add(c);
     }
+    renderContent(ch:HTMLElement){
+
+        if (this.parent instanceof TabFolder){
+            this._style.borderRadius="0px";
+            this.heading._style.borderTopWidth="0px";
+            this._style.borderTopWidth="0px";
+        }
+        if ((this.parent instanceof TabFolder)) {
+            this.heading._text = " ";
+            this.heading._style.minHeight="40px";
+            this.toolbar._styleString = "float: left";
+            this.heading._style.paddingLeft = "5px";
+        }
+        super.renderContent(ch);
+    }
+
+    protected renderChildren(ch: HTMLElement) {
+        if (this.body.children.length==1){
+             if (this.body.children[0] instanceof AbstractListControl){
+                this.renderElements([this.heading,this.body.children[0]],ch);
+
+                return;
+            }
+        }
+        super.renderChildren(ch)
+    }
 
     constructor(title: string = "") {
         super("div");
@@ -219,7 +540,7 @@ export class Section extends controls.Composite {
         this.addClassName("panel")
         this.addClassName("panel-default")
         var heading = new controls.WrapComposite("div");
-        heading._text = this.title();
+        heading._text=this.title();
         heading.wrapElement = "span";
         heading.addClassName("panel-heading");
         if (!heading._text.trim()) {
@@ -233,399 +554,233 @@ export class Section extends controls.Composite {
         super.add(heading)
         this.body.addClassName("panel-body");
         super.add(this.body);
+
+    }
+}
+class RefreshOnChange implements IValueListener{
+    constructor(private  c:AbstractListControl){
+
+    }
+    valueChanged(){
+        this.c.dataRefresh();
     }
 }
 
-function createControl(p: PropertyDescription, b: IBridge) {
-    var cm = new controls.VerticalFlex();
+export abstract class AbstractListControl extends BindableControl implements ISelectionProvider{
 
-    var group = new PropertyGroup();
-    cm.add(new Label(p.description?marked(p.description):""));
-    var groups:PropertyGroup[]=[];
-    if (p.map) {
-        var kd: PropertyDescription = {};
-        kd.displayName = "Key";
-        kd.id = "$key";
-        kd.required = true;
-        kd.scalar = true;
-        group.properties.push(kd);
+    contentPrepared:boolean;
+    sl: ISelectionListener[]=[];
+    private selection:any=[];
 
+    selectionBinding:tps.Binding=new tps.Binding("selection");
+
+    addSelectionListener(v:ISelectionListener){
+        this.sl.push(v);
     }
-    if (p.children && p.children.length > 0) {
-        p.children.forEach(x=> {
-            group.properties.push(collapseInnerProps(x));
-            //group.properties.push(x);
-        })
-        groups=groupProps(group.properties);
-        var rs:PropertyDescription[]=[];
+    removeSelectionListener(v:ISelectionListener){
+        this.sl=this.sl.filter(x=>x!==v);
     }
 
-    else {
-        var kd: PropertyDescription = {};
-        kd.displayName = "Value";
-        kd.id = "$value";
-        kd.required = true;
-        kd.scalar = true;
-        group.properties.push(kd);
-        groups=[group];
+    getSelection():any[]{
+        return this.selection;
     }
-    if (groups.length>0){
-        cm.add(renderPropertyGroup(groups[0], b))
-
-    }
-
-    if (groups.length>1) {
-        var dd = new TabFolder();
-        for (var i=1;i<groups.length;i++){
-            dd.add(renderPropertyGroup(groups[i],b,{tabsTop:true}));
+    setSelection(v:any[]){
+        this.selection=v;
+        this.contentPrepared=false;
+        this.prepareContent();
+        this.sl.forEach(x=>x.selectionChanged(v));
+        if (this.selectionBinding){
+            if (v.length==1){
+                this.selectionBinding.set(v[0]);
+            }
+            else if (v.length==0){
+                this.selectionBinding.set(null);
+            }
+            else{
+                this.selectionBinding.set(v);
+            }
         }
     }
-    cm.add(dd);
-    return cm;
-}
-declare var $: any
+    private rff=new RefreshOnChange(this)
+    onAttach(){
+        this._binding.addListener(this.rff);
+    }
+    onDetach(){
+        this._binding.removeListener(this.rff);
+    }
+    createHeader():IControl{
+        return null;
+     }
+     createBody():controls.AbstractComposite{
+        return null;
+     }
+     /**
+     * inits binding
+     * @param ch
+     */
+    initBinding(ch:HTMLElement):any{
 
-function deepCopy(obj: any) {
-    var newObj = $.extend(true, {}, obj);
-    return newObj;
-}
-
-
-export class CreateAction {
-
-    obj = {};
-
-    constructor(private pd: PropertyDescription, private b: IBinding) {
+        if (this._binding){
+            this.selectionBinding._type=this._binding.collectionBinding().componentType();
+            this.prepareContent();
+        }
+    }
+    componentType(){
+        return this._binding.collectionBinding().componentType();
+    }
+    public dataRefresh(){
+        this.contentPrepared=false;
+        this.prepareContent();
     }
 
-    run() {
-        var control = createControl(this.pd, new ObjectBridge(this.obj));
-        var view = this;
-        new wb.ShowDialogAction("Create " + this.pd.displayName, control, [{
-            title: "Create",
-            run(){
-                view.b.set(view.obj)
-            },
-            primary: true
-
-        }, {
-            title: "Cancel",
-            run(){
-
-            },
-            warning: true
-        }]).run();
+    isSelected(v){
+        return this.existInValue(v,this.getSelection());
     }
+    existInValue(v,r:any[]){
+        var plain=r.indexOf(v)!=-1;
+        if (plain){
+            return plain;
+        }
+        //check for value with same key
+        var keyProp=tps.service.keyProp(this.componentType());
+
+        if (keyProp){
+            var vl=v[keyProp];
+            if(vl) {
+                plain=plain||(r.filter(x => x[keyProp] ===vl).length!=0);
+            }
+        }
+        //now we have complete result
+        return plain;
+    }
+    private prepareContent() {
+        if (this.contentPrepared){
+            return;
+        }
+        var ac = this._binding.collectionBinding().workingCopy();
+        this.children = [];
+
+        var c=this.createHeader();
+        if (c){
+            this.children.push(c);
+        }
+        var body=this.createBody();
+        var contentB:controls.AbstractComposite=this;
+        if (body){
+            this.children.push(body);
+            contentB=body;
+        }
+        ac.forEach(x => {
+            contentB.children.push(this.toControl(x));
+        })
+        var hasRemovals=false;
+        var newSelection:any[]=[];
+        this.selection.forEach(v=>{
+            if (!this.existInValue(v,ac)){
+                hasRemovals=true;
+            }
+            else{
+                newSelection.push(v);
+            }
+        })
+        this.selection=newSelection;
+        if (hasRemovals){
+            this.setSelection(newSelection);
+        }
+        this.contentPrepared=true;
+        if (ac.length==0){
+            this.children=[]
+            var comp=new controls.Composite("div");
+            comp._style.padding="10px";
+            comp.addLabel("Nothing here yet");
+            this.add(comp)
+        }
+        this.refresh();
+    }
+
+    abstract toControl(v:any):controls.IControl;
 }
-export class EditAction {
+import uif=require("./uifactory")
+import {ISelectionProvider, ISelectionListener} from "./workbench";
+import {IValueListener, ChangeEvent, binding, Binding} from "raml-type-bindings";
+import {ListenableAction} from "./actions";
+export class SimpleListControl extends AbstractListControl{
 
-    obj = {};
-
-    constructor(private pd: PropertyDescription, private b: IBinding) {
-
-        this.obj = deepCopy(b.get());
-    }
-
-    run() {
-        var control = createControl(this.pd, new ObjectBridge(this.obj));
-        var view = this;
-        new wb.ShowDialogAction("Edit " + this.pd.displayName, control, [{
-            title: "Apply",
-            run(){
-                view.b.set(view.obj)
-            },
-            primary: true
-
-        }, {
-            title: "Cancel",
-            run(){
-
-            },
-            warning: true
-        }]).run();
-    }
-}
-
-declare var marked: any;
-
-
-export class ListView extends BindableControl implements wb.ISelectionProvider {
-
-    constructor(private pd: PropertyDescription, private emptyText: string = "") {
+    constructor(){
         super("ul")
+        this.addClassName("list-group");
     }
-
-    selectionListeners: wb.ISelectionListener[] = []
-
-    addSelectionListener(l: wb.ISelectionListener) {
-        this.selectionListeners.push(l);
-    }
-
-    removeSelectionListener(l: wb.ISelectionListener) {
-        this.selectionListeners = this.selectionListeners.filter(x=>x != l);
-    }
-
-    getSelection(): any[] {
-        if (this.selectedIndex > 0) {
-            var val = this._binding.get();
-            if (Array.isArray(val)) {
-                if (val.length > this.selectedIndex) {
-                    return [val[this.selectedIndex]]
-                }
-            }
+    toControl(v:any): controls.IControl{
+        var lab=tps.service.label(v,this._binding.type());
+        var rs= new Composite("li")
+        rs.addClassName("list-group-item")
+        rs._style.cursor="pointer";
+        if (this.isSelected(v)){
+            rs.addClassName("active");
         }
-        return [];
-    }
-
-    renderValue(v: any) {
-        if (this.pd.array) {
-            v = v["item"];
+        rs.addLabel(lab);
+        rs.onClick=()=>{
+            this.setSelection([v]);
         }
-        if (this.pd.map) {
-            var key = v["$key"];
-            var vl = v["$value"];
-            if (!vl) {
-                vl = deepCopy(v);
-                delete vl["$key"]
-            }
-            var bg = `<span class="badge">` + key + `</span>`;
-            return JSON.stringify(vl) + bg;
-        }
-        return "";
-    }
-
-    selectedIndex = 0;
-
-    protected  initBinding(ch: HTMLElement) {
-        ch.innerHTML = "";
-        var view = this;
-        if (this._binding != null) {
-
-            var b = this._binding.get();
-            if (b && Array.isArray(b) && (b.length > 0)) {
-                var elements: any[] = b;
-                var position = 0;
-                var view = this;
-                elements.forEach(z=> {
-                    var index = position;
-                    var el = document.createElement("li");
-                    el.classList.add("list-group-item");
-                    if (position == this.selectedIndex) {
-                        el.classList.add("active")
-                    }
-                    el.style.borderRadius = "0px";
-                    el.style.border = "0px";
-                    el.style.cursor = "pointer"
-                    el.style.margin = "1px";
-                    el.style.borderBottom = "1px";
-                    el.onclick = (e)=> {
-                        view.selectedIndex = index;
-                        view.initBinding(ch);
-                        this.selectionListeners.forEach(x=> {
-                            x.selectionChanged(view.getSelection())
-                        })
-                    }
-                    el.innerHTML = view.renderValue(z);
-                    ch.appendChild(el)
-                    position++;
-                })
-
-            }
-            else {
-                ch.innerHTML = this.emptyText;
-            }
-        }
+        return rs;
     }
 }
-export class TableEditor extends BindableControl {
+export class TableControl extends AbstractListControl{
 
-    initBinding() {
-        this.listView._binding = this._binding;
-        this.listView.refresh();
-        if (this._binding.get() && Array.isArray(this._binding.get())) {
-            var el: any[] = this._binding.get();
-            this._selection = el[0];
-        }
-        this.updateToolbar(this.content.toolbar);
+
+
+    constructor(){
+        super("table")
+        this.addClassName("table");
+        this.addClassName("table-striped");
     }
-
-    protected appendValue(v: any) {
-        if (this._binding != null) {
-            if (this.pd.array || this.pd.map) {
-                var value = this._binding.get();
-                var ar: any[] = [];
-                if (!Array.isArray(value)) {
-                    if (value) {
-                        ar = [value];
-                    }
-                }
-                else {
-                    ar = value;
-                }
-                ar.push(v);
-                if (v["$value"]) {
-                    v = v["$value"];
-                }
-                this._binding.set(ar);
-                this.initBinding();
-            }
-        }
-    }
-
-    protected replaceValue(old: number, v: any) {
-        if (this._binding != null) {
-            if (this.pd.array || this.pd.map) {
-                var value = this._binding.get();
-                var ar: any[] = [];
-
-                if (!Array.isArray(value)) {
-                    if (value) {
-                        ar = [value];
-                    }
-                }
-                else {
-                    ar = value;
-                }
-                ar[old] = v;
-                this._binding.set(ar);
-                this.initBinding();
-            }
-        }
-    }
-
-    protected removeValue(v: any) {
-        if (this._binding != null) {
-            if (this.pd.array || this.pd.map) {
-                var value = this._binding.get();
-                var ar: any[] = [];
-                if (!Array.isArray(value)) {
-                    if (value) {
-                        ar = [value];
-                    }
-                }
-                else {
-                    ar = value;
-                }
-                ar = ar.filter((x,i)=>x != v&&i!=v);
-                this._binding.set(ar);
-                this.initBinding();
-            }
-        }
-    }
-
-    content: Section;
-
-    listView: ListView;
-
-    _selection: any
-
-    updateToolbar(toolbar: Toolbar) {
-        toolbar.items = [];
-        var view = this;
-        toolbar.items.push({
-            title: "Create",
-            run(){
-                new CreateAction(view.pd, {
-                    get(){
-                        return {};
-                    },
-                    set(v: any){
-                        view.appendValue(v);
-                    }
-
-                }).run();
-            }
+    createHeader():controls.AbstractComposite{
+        var header= new Composite("thead");
+        var tr=new Composite("tr");
+        header.add(tr);
+        var ps = this.columnProps();
+        ps.forEach(x=>{
+            var th=new Composite("th");
+            th.addLabel(x.displayName);
+            th._style.borderBottomWidth="0px";
+            tr.add(th)
         })
-        toolbar.items.push({
-            title: "Edit Selected",
-            disabled: (view._selection == null),
-            run(){
-                new EditAction(view.pd, {
-                    get(){
-                        return view._selection;
-                    },
-                    set(v: any){
-                        view.replaceValue(view.listView.selectedIndex, v);
-                    }
-
-                }).run();
-            }
-        })
-        toolbar.items.push({
-            title: "Delete Selected",
-            danger: true,
-            disabled: (view._selection == null),
-            run(){
-                view.removeValue(view.listView.selectedIndex);
-            }
-        })
-        toolbar.refresh();
+        return header;
     }
 
-    constructor(private pd: PropertyDescription,private ctx:RenderingContext={}) {
-        super("div")
-        this._style.height = "100%";
-        this._style.width = "100%";
-        var v = new controls.VerticalFlex();
-        v._style.height = "100%";
-        v._style.width = "100%";
-        v.wrapStyle.flex = "1 1 0"
-        this.add(v);
-        var tb = new controls.HorizontalFlex();
-        var s = new Section(ctx.tabsTop?" ":pd.displayName);
-        s.body._style.padding = "0px"
-        if (ctx.tabsTop){
-            s._style.borderRadius="0px";
-            s.heading._style.borderTopWidth="0px";
-            s._style.borderTopWidth="0px";
-        }
-        var view = this;
-        this.content = s;
-        this.listView = new ListView(pd, "<div style='padding: 10px'>" + (pd.description?marked(pd.description):"") + "</div>");
-        s.add(this.listView);
-        var toolbar = s.toolbar;
-        this.listView.addSelectionListener({
-
-            selectionChanged(v: any[]){
-                if (v != null && v.length > 0) {
-                    view._selection = v[0];
-                    view.updateToolbar(toolbar)
-                }
-            }
-        })
-
-
-        tb._style.width = "100%"
-        tb._style.height = "100%"
-        //tb._style.backgroundColor="red"
-        tb.wrapStyle.flex = "1 1 0"
-        if (!ctx.tabsTop) {
-
-            tb.wrapStyle.padding = "5px"
-        }
-        else{
-            tb.wrapStyle.padding = "0px"
-            s._style.padding="0px"
-        }
-        tb.add(s);
-        //tb.add(toolbar);
-        //v.add(b)
-        v.add(tb)
-        //v.add(body);
+    private columnProps() {
+        var ps = tps.service.visibleProperties(this._binding.collectionBinding().componentType())
+        return ps;
     }
-}
+    createBody():controls.AbstractComposite{
+        return new Composite("tbody");
+    }
+    toControl(v:any): controls.IControl{
+        var lab=tps.service.label(v,this._binding.type());
+        var rs= new Composite("tr")
+        var ps = this.columnProps();
+        var sel=this.isSelected(v);
 
+        ps.forEach(p=>{
+            var td=new Composite("td");
+            if (sel) {
+                td._style.backgroundColor = "#337ab7"
+            }
+            var val=v[p.id];
+            if (!val){
+                val="";
+            }
+            //adding label
+            td.addLabel(val);
+            rs.add(td);
+        });
+        rs._style.cursor="pointer";
+        rs.onClick=()=>{
+            this.setSelection([v]);
+        }
 
-export interface IBridge {
-    get(path: string): any
-    set(path: string, v: any): any
-    keys(): string[]
-    binding(p: string): IBinding;
-}
-
-export interface IBinding {
-    get(): any
-    set(v: any)
+        return rs;
+    }
 }
 
 export class CheckBox extends BindableControl{
@@ -640,6 +795,15 @@ export class CheckBox extends BindableControl{
         this._style.margin="0px";
     }
 
+    innerSetDisabled(v: boolean){
+        super.innerSetDisabled(v);
+        if (v){
+            (<HTMLElement>this._element).style.opacity="0.4"
+        }
+        else{
+            (<HTMLElement>this._element).style.opacity="";
+        }
+    }
     protected initBinding(ch: HTMLElement): any {
         var lab=document.createElement("label")
         var input=document.createElement("input");
@@ -655,351 +819,4 @@ export class CheckBox extends BindableControl{
         lab.appendChild(document.createTextNode(this.title()))
         ch.appendChild(lab)
     }
-}
-
-export class ObjectBridge implements IBridge {
-
-    listeners:((x)=>void)[]=[]
-
-    addListener(l:(x)=>void){
-        this.listeners.push(l);
-    }
-    removeListener(l:(x)=>void){
-        this.listeners=this.listeners.filter(x=>x!=l);
-    }
-
-    constructor(private obj: any) {
-
-    }
-
-    get(path: string): any {
-        return this.obj[path];
-    }
-
-    set(path: string, v: any) {
-        if (v==null||v==""){
-            delete this.obj[path]
-        }
-        else {
-            this.obj[path] = v;
-        }
-        this.listeners.forEach(x=>x(this.obj))
-    }
-
-    binding(p: string) {
-        return new BridgeBinding(p, this);
-    }
-
-    keys() {
-        return Object.keys(this.obj)
-    }
-}
-
-export class BridgeBinding implements IBinding {
-
-    constructor(private id: string, private br: IBridge) {
-
-    }
-
-    get() {
-        return this.br.get(this.id)
-    }
-
-    set(v: any) {
-        this.br.set(this.id, v);
-    }
-}
-
-export class ArrayBinding implements IBinding {
-
-    constructor(private p: PropertyDescription, private br: IBinding) {
-    }
-
-    get() {
-        var vl = this.br.get();
-        if (this.p.array) {
-            if (Array.isArray(vl)) {
-                var ar: any[] = vl;
-                return ar.map(x=> {
-                    return {item: x}
-                });
-            }
-        }
-        return vl;
-    }
-
-    set(v: any) {
-
-        if (this.p.array) {
-            if (Array.isArray(v)) {
-                var ar = <any[]>v;
-                this.br.set(ar.map(x=>x.item))
-            }
-            else {
-                this.br.set(v);
-            }
-        }
-
-    }
-}
-export class MapBinding implements IBinding {
-
-    constructor(private id: string, private br: IBridge) {
-
-    }
-
-    get() {
-        var result: any[] = [];
-        this.br.keys().forEach(k=> {
-            var v = {
-                $key: k
-            }
-            var cl = this.br.get(k);
-            if (Array.isArray(cl)) {
-                v["$value"] = cl;
-            }
-            else if (typeof cl == "object") {
-                var vl = deepCopy(cl);
-                vl["$key"] = k;
-                v = vl;
-            }
-            else {
-                if (cl) {
-                    v["$value"] = cl;
-                }
-            }
-            result.push(v);
-        })
-        return result;
-    }
-
-    set(v: any) {
-        this.br.keys().forEach(c=> {
-            this.br.set(c, null);
-        })
-        if (Array.isArray(v)) {
-            var items:any[]=v;
-            items.forEach(x=>{
-                var vl=x["$value"];
-                if (!vl){
-                    vl=deepCopy(x);
-                    delete vl["$key"];
-                }
-                var key=x["$key"];
-                this.br.set(key,vl);
-            })
-
-        }
-    }
-}
-class ProxyBridge implements IBridge{
-
-    constructor(private parent:IBridge,private segment:string){
-
-    }
-
-    get(path: string): any {
-        var vl=this.parent.get(this.segment);
-        if (path=="$value"){
-            return vl;
-        }
-        if (vl==null){
-            return null;
-        }
-        return vl[path];
-    }
-
-    set(path: string, v: any): any {
-        if (path=="$value"){
-            if (v){
-                this.parent.set(this.segment,v);
-                return;
-            }
-            else{
-                this.parent.set(this.segment,null);
-                return;
-            }
-        }
-        var vl=this.parent.get(this.segment);
-        if (vl==null){
-            if (!v){
-                return;
-            }
-            vl={};
-        }
-        {
-            if (!v){
-                delete vl[path];
-            }
-            else {
-                vl[path] = v;
-            }
-            if (Object.keys(vl).length==0){
-                vl=null;
-            }
-            this.parent.set(this.segment, vl);
-        }
-    }
-
-    keys(): string[] {
-        var vl=this.parent.get(this.segment);
-        if (vl){
-            return Object.keys(vl);
-        }
-        return [];
-    }
-
-    binding(p: string): IBinding {
-        return new BridgeBinding(p,this);
-    }
-}
-class NillBinding implements IBinding{
-    constructor(private  p:IBinding){
-
-    }
-    get(){
-        var r=this.p.get();
-        if (r){
-            return true
-        }
-    }
-    set(v:any){
-        if (v){
-            this.p.set("!!!NULL_VALUE")
-        }
-    }
-}
-var binding = function (bridge: IBridge, p:PropertyDescription) {
-    var segments=p.id.split("=>");
-    var lst=p.id;
-    if (segments.length>0){
-        lst=segments[segments.length-1];
-        for (var i=0;i<segments.length-1;i++){
-            bridge=new ProxyBridge(bridge,segments[i])
-        }
-    }
-    var ls= bridge.binding(lst);
-    if (p.array){
-        ls=new ArrayBinding(p,ls);
-    }
-    if (p.map){
-        ls=new MapBinding(p.id,bridge);
-    }
-    if (p.nil){
-        ls=new NillBinding(ls);
-    }
-    return ls;
-};
-export interface RenderingContext{
-    tabsTop?:boolean;
-}
-
-export function renderPropertyGroup(p: PropertyGroup, bridge: IBridge,ctx:RenderingContext={}) {
-    var maxLength = 0;
-    var container = new controls.VerticalFlex();
-    container.setTitle(p.caption);
-    p.properties.forEach(x=> {
-        if (x.scalar) {
-            var dl = x.displayName.length;
-            if (dl > maxLength) {
-                maxLength = dl;
-            }
-        }
-    })
-    maxLength += 5;
-    p.properties.forEach(p=> {
-        if (p.map) {
-            return;
-        }
-        if (p.array) {
-            return;
-        }
-        if (p.scalar) {
-            if (!p.boolean&&!p.nil) {
-                var r = new InputGroup();
-                var nAddon = new InputGroupAddOn();
-                r._style.width = "100%";
-                r.add(nAddon)
-                nAddon._style.width = maxLength + "ch";
-                nAddon._style.textAlign = "left"
-                var ll = new controls.Composite("span");
-                ll.addLabel(p.displayName + (p.required ? "* " : " "));
-                if (p.description) {
-                    ll.add(new Help(p.description))
-                }
-                ll._style.cssFloat = "left";
-                nAddon.add(ll);
-                if (p.enumOptions) {
-                    var select = new Select();
-                    select._binding = binding(bridge, p);
-                    p.enumOptions.forEach(x=> {
-                        select.add(new Option(x))
-                    })
-                    r.add(select);
-                }
-                else {
-                    var w:TextArea|Input = new Input();
-                    if (p.multiline){
-                        w= new TextArea();
-                        w._style.minHeight="200px";
-                        w._style.borderRadius="0px";
-                        if (ctx.tabsTop){
-                            w._style.borderTopWidth="0px";
-                            container.add(w);
-                            return;
-                        }
-                        w._style.borderWidth="0px";
-                        w._binding = binding(bridge, p) ;
-
-                        var s=new Section(p.displayName)
-                        s._style.margin="5px";
-                        s.body._style.padding="0px";
-
-                        s.add(w);
-                        container.add(s);
-                        return;
-                    }
-                    //w.attrs["data-provide"]="typeahead";
-                    //w.attrs["data-source"]='["typeahead","ded"]';
-                    w._binding = binding(bridge, p);
-                    r.add(w);
-
-                }
-                container.add(r);
-            }
-        }
-    })
-    p.properties.forEach(p=> {
-        if (p.map) {
-            var rs = new TableEditor(p,ctx);
-            rs._binding = binding(bridge,p)
-            container.add(rs);
-            return;
-        }
-        else if (p.array) {
-            var rs = new TableEditor(p,ctx);
-            rs._binding = binding(bridge,p)
-            container.add(rs);
-            return;
-        }
-        else{
-
-        }
-    })
-    var checks=new WrapComposite("span")
-    checks.wrapElement="span"
-    p.properties.forEach(p=> {
-        if (p.nil||p.boolean) {
-            var rs = new CheckBox(p.displayName);
-            rs._binding = binding(bridge,p)
-            checks.add(rs);
-            var h=new Help(p.description);
-            checks.add(h);
-            h._style.paddingRight="10px"
-            h._style.marginTop="2px"
-            return;
-        }
-    })
-    container.add(checks)
-    return container;
 }

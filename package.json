@@ -1,17 +1,19 @@
 {
   "name": "raml-semantic-ui",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "private": false,
   "main": "dist/app.js",
   "scripts": {
     "compile": "rm -rf dist/ && ./node_modules/typescript/bin/tsc",
-    "build": "npm run compile"
+    "build": "npm run compile",
+    "start": "budo ./dist/demo.js  --serve bundle.js --live"
   },
   "devDependencies": {
     "typescript": "^1.8.10"
   },
   "dependencies": {
-    "browser-request": "^0.3.3"
+    "browser-request": "^0.3.3",
+    "raml-type-bindings":"*"
   },
   "directories": ["dist"]
 

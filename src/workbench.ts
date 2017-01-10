@@ -22,6 +22,7 @@ export import ToolbarRenderer=controls.ToolbarRenderer;
 export import Context=controls.Context;
 export import DrowpdownMenu=controls.DrowpdownMenu;
 import {IControl, Label} from "./controls";
+import {IValueListener, ChangeEvent} from "raml-type-bindings";
 
 declare var require: any
 
@@ -104,10 +105,18 @@ export class Pane implements IPartHolder {
     }
 
     toolbarContentElement: Element;
+    panelElement: Element
 
     setContextMenu(m: IMenu) {
         this.contextMenuElement.innerHTML = "";
-
+        if (this.panelElement) {
+            if (m.items.length == 0) {
+                this.panelElement.setAttribute("data-toggle", "")
+            }
+            else {
+                this.panelElement.setAttribute("data-toggle", "context")
+            }
+        }
         new DrowpdownMenu(m).render(this.contextMenuElement)
     }
 
@@ -159,6 +168,7 @@ export class Pane implements IPartHolder {
         this.contextMenuElement = document.getElementById(cmenuInnerId);
         this.viewMenuButton = document.getElementById(mid)
         var bel = document.getElementById(bid);
+        this.panelElement=bel.parentElement;
         if (this._v) {
             this._v.render(bel);
         }
@@ -188,6 +198,7 @@ export class Pane implements IPartHolder {
             }
         }
         handleResize();
+
     }
     titleId:string
 
@@ -587,6 +598,17 @@ export class TreeView extends ViewPart {
         return this.afterSearch(s);
     }
 
+
+    constructor(id, title) {
+        super(id, title);
+        this.setContentProvider(new ArrayContentProvider());
+        this.labelProvider={
+            label(e:any){
+                return e;
+            }
+        }
+    }
+
     /**
      *
      * @param s
@@ -891,9 +913,20 @@ export interface INavBarTheme {
     brandImage: string
     brandImageHeight: string
     brandImageStyle: string
+    brandRight?: string
 }
 var n=1;
 
+export var defaultNavBar={
+    style: ' margin-bottom: 5px;background-image: url(https://github.com/themes/midnight/images/nav-bg.gif)',
+    brandImage: 'http://marketplace.eclipse.org/sites/default/files/styles/ds_medium/public/Logo110_80_1.png',
+    brandImageHeight: '46px',
+    brandImageStyle: 'margin-left: 2px;margin-top:2px;margin-right: 10px',
+    brandRight:`<a class="header-logo-invertocat" href="https://github.com/apiregistry/registry" 
+                   aria-label="Homepage" >
+                   <img src="./images/GitHub-Mark-Light-32px.png" height="32" style="margin: 8px"/>
+                </a>`
+}
 export class NavBar implements controls.IControl {
 
     _title: string = "";
@@ -902,12 +935,7 @@ export class NavBar implements controls.IControl {
         return 'n'+(n++);
     }
 
-    _theme: INavBarTheme = {
-        style: ' margin-bottom: 5px;background-image: url(https://github.com/themes/midnight/images/nav-bg.gif)',
-        brandImage: 'http://marketplace.eclipse.org/sites/default/files/styles/ds_medium/public/Logo110_80_1.png',
-        brandImageHeight: '46px',
-        brandImageStyle: 'margin-left: 2px;margin-top:2px;margin-right: 10px'
-    }
+    _theme: INavBarTheme = defaultNavBar
 
     title() {
         return this._title;
@@ -956,10 +984,7 @@ export class NavBar implements controls.IControl {
             
             <div class="navbar-right">
                 <ul class="nav navbar-nav" id="${id}"></ul>
-                <a class="header-logo-invertocat" href="https://github.com/apiregistry/registry" 
-                   aria-label="Homepage" >
-                   <img src="./images/GitHub-Mark-Light-32px.png" height="32" style="margin: 8px"/>
-                </a>
+                ${this._theme.brandRight}
             </div>
         </div>        
     </nav>`;
@@ -1002,7 +1027,7 @@ export class Application implements controls.IControl {
     private status: Element;
     private perspective: IPerspective;
 
-    constructor(private _title: string, private initialPerspective: IPerspective, element?: Element|string,currentP?:IPerspective) {
+    constructor(private _title: string, private initialPerspective: IPerspective, element?: Element|string,currentP?:IPerspective,theme?:INavBarTheme) {
         this.perspective = currentP?currentP:initialPerspective;
         this.perspective.actions.forEach(a=>this.nb.getMenuBar().add(a))
         if (element) {
@@ -1100,6 +1125,7 @@ export class ShowDialogAction implements IContributionItem {
     run() {
         var title = this.title
         var bs=[];
+        var bNum=0;
         this.buttons.forEach(x=>{
             var csCl="";
             if (x.primary){
@@ -1115,6 +1141,7 @@ export class ShowDialogAction implements IContributionItem {
                 csCl="btn-danger";
             }
             bs.push({
+                id:"b"+bNum,
                 label:x.title,
                 action: (dlg)=> {
                     dlg.close()
@@ -1122,6 +1149,7 @@ export class ShowDialogAction implements IContributionItem {
                 },
                 cssClass:csCl
             })
+            bNum=bNum+1;
         })
         if (bs.length==0){
             bs.push({
@@ -1131,9 +1159,45 @@ export class ShowDialogAction implements IContributionItem {
                 }
             });
         }
+        var dlgThis=this;
+        var lst:IValueListener={
+            valueChanged(c:ChangeEvent){
+                var index=dlgThis.buttons.indexOf(c.target);
+                var id="b"+index;
+                var btn=dlg.getButton(id);
+                var cm:IContributionItem=c.target;
+                if (cm.disabled){
+                    btn.disable();
+                }
+                else{
+                    btn.enable();
+                }
+            }
+        }
         var dlg = BootstrapDialog.show({
-            title: title, buttons: bs
+            title: title, buttons: bs,
+            onhidden:()=>{
+                this.buttons.forEach(x=>{
+                    if ((<any>x).addListener){
+                        (<any>x).removeListener(lst);
+                    }
+                })
+            }
         })
+        if (this.buttons.length>0){
+            this.buttons.forEach(x=>{
+                if ((<any>x).addListener){
+                    (<any>x).addListener(lst);
+                }
+            })
+            for (var i=0;i<this.buttons.length;i++){
+                if (this.buttons[i].disabled){
+                    var id="b"+i;
+                    var btn=dlg.getButton(id);
+                    btn.disable();
+                }
+            }
+        }
         if (typeof this.control == "string") {
             dlg.$modalBody.html(this.control)
         }
@@ -1303,6 +1367,8 @@ export class BackAction implements IContributionItem {
     }
 
 }
+
+
 var w:any=window;
 w.WorkbenchUtils={};
 w.WorkbenchUtils.getView=getView;
