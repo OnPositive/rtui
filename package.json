@@ -12,9 +12,11 @@
     "typescript": "^1.8.10"
   },
   "dependencies": {
+    "@types/jquery": "^2.0.39",
     "browser-request": "^0.3.3",
-    "raml-type-bindings":"*"
+    "raml-type-bindings": "0.0.7"
   },
-  "directories": ["dist"]
-
+  "directories": [
+    "dist"
+  ]
 }

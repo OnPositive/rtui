@@ -1,8 +1,6 @@
 import {IValueListener, Binding} from "raml-type-bindings";
 declare var require: any
-require("../lib/bootstrap-contextmenu")
 require("../lib/bootstrap-treeview")
-
 export interface IControl {
     render(e: Element);
     dispose?();
@@ -222,6 +220,10 @@ function disable(e:Element,v:boolean){
         disable(e.children.item(i),v)
     }
 }
+export interface LifeCycleListener{
+    attached(c:Composite,e:Element);
+    detached(c:Composite,e:Element);
+}
 export class Composite extends AbstractComposite {
 
     constructor(private tagName: string) {
@@ -240,8 +242,21 @@ export class Composite extends AbstractComposite {
             disable(<HTMLElement>this._element,v);
         }
     }
+    private lifecycle:LifeCycleListener[]=[];
 
+    addLifycleListener(l:LifeCycleListener){
+        this.lifecycle.push(l)
+    }
+    removeLifycleListener(l:LifeCycleListener){
+        this.lifecycle=this.lifecycle.filter(x=>x!=l);
+    }
 
+    onAttach(e:Element){
+        this.lifecycle.forEach(x=>x.attached(this,e))
+    }
+    onDetach(e:Element){
+        this.lifecycle.forEach(x=>x.detached(this,e))
+    }
     _style: CSSStyleDeclaration = <CSSStyleDeclaration>{}
 
     _styleString: string;

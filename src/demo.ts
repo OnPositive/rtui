@@ -25,6 +25,10 @@ class Details extends workbench.ViewPart {
         }
     }
 
+    constructor(t:string,i:string){
+        super(t,i);
+    }
+
     setInput(i: any) {
         this.input = i
         this.refresh();

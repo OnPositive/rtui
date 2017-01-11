@@ -127,6 +127,7 @@ export abstract class BindableControl extends controls.Composite {
     afterCreate?:(c:BindableControl)=>void
 
     onAttach(e:Element){
+        super.onAttach(e);
         if (this.afterCreate){
             this.afterCreate(this)
         }
@@ -140,9 +141,12 @@ export abstract class BindableControl extends controls.Composite {
     }
 
     onDetach(e:Element){
+        super.onDetach(e);
         this._binding.root().removeListener(this.valListener);
     }
 }
+
+
 
 export class Input extends BindableControl {
     constructor() {
@@ -453,7 +457,9 @@ export abstract class ActionPresenter extends controls.Composite implements IVal
         })
     }
     valueChanged(c:ChangeEvent){
-        this._element.innerHTML="";
+        if (this._element) {
+            this._element.innerHTML = "";
+        }
         this.renderElement(<HTMLElement>this._element);
 
     }
@@ -486,28 +492,52 @@ export class Toolbar extends ActionPresenter implements IValueListener{
         rnd.render(this._element);
     }
 }
+declare var $:any;
 export class DropDown extends ActionPresenter implements IValueListener{
 
     constructor() {
         super("div")
         this._styleString = "float: right";
     }
+    ownerId: string;
     onAttach(){
         super.onAttach()
         this.valueChanged(null);
     }
     renderElement(e:HTMLElement){
-        var id=this.id()+"menu"
-        e.innerHTML=`<ul class="dropdown-menu" id='${id}'role="menu" aria-labelledby="2"></ul>`;
-        new controls.DrowpdownMenu(<any>this).render(document.getElementById(id));
+        var view=this;
+        $.contextMenu({
+            selector:"#"+view.ownerId+">*",
+            build:()=>{ return { items: view.mapItems()}}
+        })
     }
+    mapItems(){
+        var result={}
+        this.items.forEach(x=>{
+            result[x.id?x.id:x.title]={
+                name:x.title,
+                icons:x.image,
+                disabled:x.disabled,
+                callback: ()=>{ x.run() }
+            }
+        })
+        return result;
+    }
+
     addTo(v:Composite){
-        v.attrs["data-target"]="#"+this.id();
-        v.attrs["data-toggle"]="context";
-        v._footer=this;
+        this.ownerId=v.id();
+        var view=this;
+        v.addLifycleListener({
+            attached(c,e){
+
+                view.renderElement(<HTMLElement>e);
+            },
+            detached(c,e){
+
+            }
+        })
     }
 }
-
 
 export class Section extends controls.Composite {
 
@@ -631,11 +661,13 @@ export abstract class AbstractListControl extends BindableControl implements ISe
         }
     }
     private rff=new RefreshOnChange(this)
-    onAttach(){
+    onAttach(e:Element){
         this._binding.addListener(this.rff);
+        super.onAttach(e);
     }
-    onDetach(){
+    onDetach(e:Element){
         this._binding.removeListener(this.rff);
+        super.onDetach(e);
     }
     createHeader():IControl{
         return null;

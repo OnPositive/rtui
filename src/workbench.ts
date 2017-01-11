@@ -23,6 +23,7 @@ export import Context=controls.Context;
 export import DrowpdownMenu=controls.DrowpdownMenu;
 import {IControl, Label} from "./controls";
 import {IValueListener, ChangeEvent} from "raml-type-bindings";
+import {DropDown} from "./forms";
 
 declare var require: any
 
@@ -96,7 +97,7 @@ export class Pane implements IPartHolder {
     _v: IWorkbenchPart;
 
     menuContentElement: Element;
-    contextMenuElement: Element;
+
     viewMenuButton: Element
     _application: Application
 
@@ -106,18 +107,13 @@ export class Pane implements IPartHolder {
 
     toolbarContentElement: Element;
     panelElement: Element
+    drop=new DropDown();
 
     setContextMenu(m: IMenu) {
-        this.contextMenuElement.innerHTML = "";
-        if (this.panelElement) {
-            if (m.items.length == 0) {
-                this.panelElement.setAttribute("data-toggle", "")
-            }
-            else {
-                this.panelElement.setAttribute("data-toggle", "context")
-            }
+        this.drop.items=m.items;
+        if (m.items.length>0) {
+            this.drop.renderElement(null);
         }
-        new DrowpdownMenu(m).render(this.contextMenuElement)
     }
 
     setViewMenu(m: IMenu) {
@@ -128,6 +124,7 @@ export class Pane implements IPartHolder {
         else {
             this.viewMenuButton.setAttribute("style", "display:inherit")
         }
+
         new DrowpdownMenu(m).render(this.menuContentElement)
     }
 
@@ -152,20 +149,20 @@ export class Pane implements IPartHolder {
         var mid = nextId();
         this.hid=hid;
         var menuId = nextId();
-        var cmenuId = nextId();
+
         var cmenuInnerId = nextId();
         var tid = nextId();
         var searchId = nextId();
-        var cmenu = `<div id='${cmenuId}'><ul class="dropdown-menu"  id="${cmenuInnerId}"role="menu"  aria-labelledby="${mid}"></ul></div>`;
+
         var cnt = `<div style='display: flex;flex-direction: column;height: 100%;width: 99.9%;margin-bottom:0px;overflow: hidden' class="panel panel-primary"><div id="${hid}" class="panel-heading" style="flex: 0 0 auto;display: flex"></div>
-        <div class="panel-body"  data-toggle="context" data-target="#${cmenuId}" style="flex: 1 1 0;display: flex;overflow: hidden;margin: 0;padding: 0" ><div style="width: 100%" id="${bid}"></div>${cmenu}</div></div>`
+        <div class="panel-body" id="${cmenuInnerId}" style="flex: 1 1 0;display: flex;overflow: hidden;margin: 0;padding: 0" ><div style="width: 100%" id="${bid}"></div></div></div>`
         this._part.element().innerHTML = cnt;
 
         this.updateHeader(searchId, tid, mid, menuId);
 
         this.menuContentElement = document.getElementById(menuId);
         this.toolbarContentElement = document.getElementById(tid);
-        this.contextMenuElement = document.getElementById(cmenuInnerId);
+
         this.viewMenuButton = document.getElementById(mid)
         var bel = document.getElementById(bid);
         this.panelElement=bel.parentElement;
@@ -196,6 +193,10 @@ export class Pane implements IPartHolder {
                         view.onSearch((<any>ie).value);
                     }, 200)
             }
+        }
+        this.drop.ownerId=cmenuInnerId;
+        if (this.drop.items.length>0){
+            this.drop.renderElement(null);
         }
         handleResize();
 
