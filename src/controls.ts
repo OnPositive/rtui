@@ -115,7 +115,9 @@ export class DrowpdownMenu {
                 a.innerHTML = x.title;
             }
             li.appendChild(a);
-            host.appendChild(li);
+            if (host) {
+                host.appendChild(li);
+            }
         })
     }
 }
@@ -392,7 +394,7 @@ export class WrapComposite extends Composite {
 }
 export class Form extends Composite {
     constructor() {
-        super("form")
+        super("div")
         this._style.padding = "10px";
         this._style.width = "100%"
     }
@@ -728,15 +730,15 @@ export class HorizontalTabFolder extends Composite {
 
     innerRender(e: Element) {
         var f = new Form();
-        f._style.height = "100%"
-        f._style.overflow="auto"
+        //f._style.height = "100%"
+        //f._style.overflow="auto"
         var vv = new VerticalFlex();
-        vv.wrapStyle.height = "100%";
+        //vv.wrapStyle.height = "100%";
         var m = new HorizontalFlex();
-        vv._style.height = "100%"
+        //vv._style.height = "100%"
         m._style.flex = "1 1 auto"
         //m._style.backgroundColor="gray"
-        m._style.height = "100%"
+        //m._style.height = "100%"
         var view = this;
         var hide = false;
 

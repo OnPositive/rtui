@@ -185,7 +185,7 @@ export class DisplayManager {
             return group;
         }
         else {
-            if (groups[0].properties.length < 6) {
+            if (groups[0].properties.length < 6||true) {
                 var rs: controls.Composite = <controls.Composite>this.renderGroup(b, groups[0], r, true&&(!r.noStatus));
                 var tf = groups.length<=4?new forms.TabFolder():new controls.HorizontalTabFolder("div");
                 tf._style.padding="5px";
@@ -205,9 +205,9 @@ export class DisplayManager {
                 return rs;
             }
         }
-        var vs: tps.metakeys.VisibleWhen = <any>b.type();
-
-        return null;
+        // var vs: tps.metakeys.VisibleWhen = <any>b.type();
+        //
+        // return null;
     }
 
     private copyContext(r: RenderingContext) {
