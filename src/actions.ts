@@ -99,6 +99,7 @@ export class CreateAction extends CollectionAction{
         var sr=tp.service.resolvedType(this.selection.type());
         var ni=tp.service.newInstance(this.selection.type())
         var nn=new tp.Binding("");
+        nn.context=this.selection;
         nn.value=ni;
         nn._type=tp.service.resolvedType({
             id:"",
@@ -111,7 +112,6 @@ export class CreateAction extends CollectionAction{
         });
     }
 }
-
 
 export class EditAction extends CollectionAction{
 
@@ -127,6 +127,7 @@ export class EditAction extends CollectionAction{
         var sr=tp.service.resolvedType(this.selection.type());
         var ni=tp.service.newInstance(this.selection.type())
         var nn=new tp.Binding("");
+        nn.context=this.selection;
         nn.value=tp.service.workingCopy(this.selection.get(),this.selection.type());
         nn._type=tp.service.resolvedType({
             id:"",

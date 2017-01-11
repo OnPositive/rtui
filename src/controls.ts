@@ -1,4 +1,4 @@
-import {IValueListener} from "raml-type-bindings";
+import {IValueListener, Binding} from "raml-type-bindings";
 declare var require: any
 require("../lib/bootstrap-contextmenu")
 require("../lib/bootstrap-treeview")
@@ -207,61 +207,7 @@ export abstract class AbstractComposite implements IControl {
 declare var window:any;
 
 
-export class HorizontalTabFolder extends AbstractComposite {
 
-    innerRender(e: Element) {
-        e.innerHTML = "";
-        var f = new Form();
-        f._style.height = "100%"
-        f._style.overflow="auto"
-        var vv = new VerticalFlex();
-        vv.wrapStyle.height = "100%";
-        var m = new HorizontalFlex();
-        vv._style.height = "100%"
-        m._style.flex = "1 1 0"
-        //m._style.backgroundColor="gray"
-        m._style.height = "100%"
-        var view = this;
-        var hide = false;
-
-
-        if (true) {
-            var t = new workbench.TreeView("", "");
-            t.styleString = "overflow: auto;flex: 1 1 0; min-height: 50px;height: 100%;display: block;background: lightgray; min-width:200px"
-            m.add(t);
-            m.add(f);
-            t.setLabelProvider({
-                label(e: any): string{
-                    return e.title();
-                }
-            })
-            t.setContentProvider(new workbench.ArrayContentProvider())
-            t.setInput(this.children)
-            t.addSelectionListener({
-                selectionChanged(v: any[]){
-                    if (v.length == 1) {
-                        f.children = []
-                        f.add(v[0]);
-                        f.refresh();
-                    }
-                }
-            })
-            if (this.children.length <= 1) {
-                hide = true;
-            }
-
-        }
-
-        vv.add(m)
-        vv.render(e);
-        if (hide) {
-            t.hide();
-        }
-        if (this.children && this.children.length > 0) {
-            t.select(this.children[0]);
-        }
-    }
-}
 
 function copyProps(a: any, b: any) {
     Object.keys(a).forEach(k => {
@@ -317,6 +263,10 @@ export class Composite extends AbstractComposite {
 
     addClassName(c: string) {
         this._classNames.push(c);
+    }
+    removeClassName(c: string) {
+        this._classNames=this._classNames.filter(x=>x!=c);
+
     }
 
     style() {
@@ -729,6 +679,8 @@ if (!window.observer) {
     observer.observe(document, config);
     window.observer=observer;
 }
+import forms=require("./forms")
+import tps=require("raml-type-bindings")
 export class SourceCode extends Composite{
 
     _content:string;
@@ -770,5 +722,66 @@ export class SourceCode extends Composite{
                 }
             },100)
         }
+    }
+}
+export class HorizontalTabFolder extends Composite {
+
+    innerRender(e: Element) {
+        var f = new Form();
+        f._style.height = "100%"
+        f._style.overflow="auto"
+        var vv = new VerticalFlex();
+        vv.wrapStyle.height = "100%";
+        var m = new HorizontalFlex();
+        vv._style.height = "100%"
+        m._style.flex = "1 1 auto"
+        //m._style.backgroundColor="gray"
+        m._style.height = "100%"
+        var view = this;
+        var hide = false;
+
+
+        if (true) {
+            var t = new forms.SimpleListControl();
+            //t.styleString = "overflow: auto;flex: 1 1 0; min-height: 50px;height: 100%;display: block;background: lightgray; min-width:200px"
+            m.add(t);
+            m.add(f);
+            // t.setLabelProvider({
+            //     label(e: any): string{
+            //         return e.title();
+            //     }
+            // })
+            var b=new tps.Binding("");
+            b._type={
+                type: tps.TYPE_ARRAY,
+                itemType: tps.TYPE_ANY
+            }
+            t._binding=b
+            t._binding.set(this.children);
+            //t.setContentProvider(new workbench.ArrayContentProvider())
+            //t.setInput(this.children)
+            t.addSelectionListener({
+                selectionChanged(v: any[]){
+                    if (v.length == 1) {
+                        f.children = []
+                        f.add(v[0]);
+                        f.refresh();
+                    }
+                }
+            })
+            if (this.children.length <= 1) {
+                hide = true;
+            }
+
+        }
+
+        vv.add(m)
+        vv.render(e);
+        // if (hide) {
+        //     t.hide();
+        // }
+        if (this.children && this.children.length > 0) {
+             t.select(this.children[0]);
+         }
     }
 }

@@ -5,6 +5,8 @@ import actions=require("./actions")
 import IBinding=tps.IBinding
 import IPropertyGroup=tps.ts.IPropertyGroup;
 import {RadioSelect, Button} from "./forms";
+import {Binding} from "raml-type-bindings";
+import {Composite} from "./controls";
 
 
 export interface RenderingContext {
@@ -12,6 +14,7 @@ export interface RenderingContext {
     tabsTop?: boolean
     horizontalBooleans?: boolean,
     dialog?: boolean
+    noStatus?:boolean
 }
 
 
@@ -41,6 +44,7 @@ tps.declareMeta(tps.TYPE_BOOLEAN, BooleanControlFactory);
 declare var $:any
 const StringControlFactory: IControlFactory = {
     createControl(b: IBinding, rc?: RenderingContext){
+
         var r = new forms.InputGroup();
         var nAddon = new forms.InputGroupAddOn();
         r._style.width = "100%";
@@ -81,12 +85,16 @@ const StringControlFactory: IControlFactory = {
                     return w;
                 }
                 w._style.borderWidth = "0px";
+                w._style.height="100%"
+                w._style.flex="1 1 auto"
                 w._binding = b;
-                var s = new forms.Section(b.type().displayName)
+                var vm=new controls.Composite("div");
+                var s = new forms.Section(b.type().displayName,true)
                 s._style.margin = "5px";
                 s.body._style.padding = "0px";
 
                 s.add(w);
+
                 return s;
             }
             var te=(<tps.metakeys.TypeAhead>b.type()).typeahead;
@@ -105,9 +113,23 @@ const StringControlFactory: IControlFactory = {
 }
 const ArrayControlFactory: IControlFactory = {
     createControl(b: IBinding, rc?: RenderingContext){
-        var r = new forms.Section(b.type().displayName);
+        var r = new forms.Section(b.type().displayName,true);
+        if (tps.service.isMultiSelect(b.type())){
+            var bm=new forms.ButtonMultiSelectControl();
+            var ct=tps.service.componentType(b.type());
+            var cl=new tps.Binding("");
+            cl.value=forms.enumOptions(ct,b);
+            cl._type=b.type();
+            bm._binding=cl;
+            bm.selectionBinding=<Binding>b;
+            var cmm=new controls.Composite("span")
+            cmm.setTitle(b.type().displayName);
+            cmm.add(bm)
+            return cmm;
+        }
         var lst:forms.AbstractListControl = new forms.SimpleListControl();
         var props=tps.service.visibleProperties(b.collectionBinding().componentType());
+
         if (props.length>1){
             var tb=new forms.TableControl();
             tb._binding=b;
@@ -128,7 +150,6 @@ const ArrayControlFactory: IControlFactory = {
         return r;
     }
 }
-
 
 tps.declareMeta(tps.TYPE_SCALAR, StringControlFactory);
 tps.declareMeta(tps.TYPE_ARRAY, ArrayControlFactory);
@@ -155,32 +176,32 @@ export class DisplayManager {
             return tp;
         }
         var groups = tps.service.propertyGroups(b.type());
-
         if (groups.length == 0) {
             return new controls.Label(tps.service.label(b.get(), b.type()));
         }
         if (groups.length == 1) {
-            return this.renderGroup(b, groups[0], r, true);
+            var group= this.renderGroup(b, groups[0], r, r.noStatus?false:true);
+            group.setTitle(b.type().displayName);
+            return group;
         }
         else {
             if (groups[0].properties.length < 6) {
-                var rs: controls.Composite = <controls.Composite>this.renderGroup(b, groups[0], r, true);
-                var qm=new controls.Composite("div");
-                qm._style.flex="1 1 0";
-                var tf = new forms.TabFolder();
-                tf._style.height="100%";
-                tf._style.margin = "5px";
+                var rs: controls.Composite = <controls.Composite>this.renderGroup(b, groups[0], r, true&&(!r.noStatus));
+                var tf = groups.length<=4?new forms.TabFolder():new controls.HorizontalTabFolder("div");
+                tf._style.padding="5px";
                 for (var i = 1; i < groups.length; i++) {
                     var ss: controls.IControl = this.renderGroup(b, groups[i]);
                     if (ss instanceof controls.VerticalFlex) {
                         if (ss.children.length == 1) {
-                            ss = ss.children[0];
+                            var  vv=ss.children[0];
+
+                            ss = vv;
                         }
                     }
                     tf.add(ss);
                 }
-                qm.add(tf);
-                rs.add(qm);
+                //qm.add(tf);
+                rs.add(tf);
                 return rs;
             }
         }
@@ -203,6 +224,7 @@ export class DisplayManager {
 
     renderGroup(b: IBinding, g: tps.ts.IPropertyGroup, r?: RenderingContext, needStatus: boolean = false) {
         var result = new controls.VerticalFlex();
+        result._style.flex="1 1 auto";
         result.setTitle(g.caption);
         if (needStatus) {
             let rnd = new forms.StatusRender();
@@ -229,6 +251,7 @@ export class DisplayManager {
 
             var o = this.copyContext(r);
             o.dialog = false;
+            o.noStatus=true;
             result.add(this.createControl(b.binding(x.id), o));
 
         });

@@ -7,14 +7,6 @@ import wb=require("./workbench");
 import {IControl, Label, Composite, WrapComposite, VerticalFlex} from "./controls";
 
 
-export class Form extends controls.Composite {
-    constructor() {
-        super("form")
-        this._style.padding = "10px";
-        this._style.width = "100%"
-    }
-}
-
 export class TabFolder extends controls.WrapComposite{
 
     constructor(){
@@ -38,6 +30,7 @@ export class TabFolder extends controls.WrapComposite{
         ll.innerHTML=c;
         ch.appendChild(ll);
     }
+
     protected wrap(p:HTMLElement,c?:IControl){
         var d=document.createElement(this.wrapElement);
 
@@ -57,7 +50,6 @@ export class TabFolder extends controls.WrapComposite{
         ch.appendChild(cc);
         super.renderChildren(cc);
     }
-
 
 }
 export class InputGroup extends controls.Composite {
@@ -100,9 +92,18 @@ export abstract class BindableControl extends controls.Composite {
         var disabled=false;
         if (m.disabledWhen){
             disabled=tps.calcCondition(m.disabledWhen,this._binding);
+
+        }
+        if (tps.service.isReadonly(this._binding.type())){
+            disabled=true;
         }
         this.setDisabled(disabled);
+        var val=this._binding.get();
+        this.updateFromValue(val);
         return;
+    }
+    protected updateFromValue(v:any){
+
     }
 
 
@@ -119,7 +120,6 @@ export abstract class BindableControl extends controls.Composite {
             }
         }
         this.initBinding(ch);
-
     }
 
     protected abstract initBinding(ch: HTMLElement);
@@ -132,12 +132,13 @@ export abstract class BindableControl extends controls.Composite {
         }
         if (this._binding){
             var m:tps.metakeys.VisibleWhen&tps.metakeys.DisabledWhen&tps.metakeys.EnumValues&tps.metakeys.TypeAhead=this._binding.type();
-            if (m.visibleWhen||m.hiddenWhen||m.disabledWhen||m.enumValues||m.typeahead){
-                this._binding.root().addListener(this.valListener);
-                this.updateVisibility();
-            }
+            //if (m.visibleWhen||m.hiddenWhen||m.disabledWhen||m.enumValues||m.typeahead){
+            this._binding.root().addListener(this.valListener);
+            this.updateVisibility();
+            //}
         }
     }
+
     onDetach(e:Element){
         this._binding.root().removeListener(this.valListener);
     }
@@ -149,7 +150,15 @@ export class Input extends BindableControl {
         this.addClassName("form-control");
 
     }
-
+    protected updateFromValue(v:any){
+        var el: HTMLInputElement = <HTMLInputElement>this._element;
+        if (v!=el.value){
+            if (v===undefined||v===null){
+                v="";
+            }
+            el.value=""+v;
+        }
+    }
     protected initBinding(ch: HTMLElement) {
         var el: HTMLInputElement = <HTMLInputElement>ch;
         if (this._binding) {
@@ -174,7 +183,9 @@ export class Input extends BindableControl {
 
             el.value = val;
             el.onkeyup = (e)=> {
-
+                this._binding.set(el.value);
+            }
+            el.onchange = (e)=> {
                 this._binding.set(el.value);
             }
         }
@@ -221,25 +232,29 @@ export class Help extends controls.Composite {
         this.attrs.title = value;
     }
 }
-function enumValues(b:IBinding):any[]{
-    var enumv=b.type().enum;
-    if (!enumv){
-        var enumF=(<tps.metakeys.EnumValues>b.type()).enumValues;
-        enumv=tps.calcExpression(enumF,b);
-        if (!Array.isArray(enumv)){
-            if (typeof enumv=="object"){
-                enumv=Object.keys(enumv);
+export let enumOptions = function (type: tps.Type, b: IBinding) {
+    var enumv = type.enum;
+    if (!enumv) {
+        var enumF = (<tps.metakeys.EnumValues>type).enumValues;
+        enumv = tps.calcExpression(enumF, b);
+        if (!Array.isArray(enumv)) {
+            if (typeof enumv == "object") {
+                enumv = Object.keys(enumv);
             }
         }
     }
 
-    if (!enumv){
-        enumv=[]
+    if (!enumv) {
+        enumv = []
     }
     return enumv;
+};
+export function enumValues(b:IBinding):any[]{
+    let type = b.type();
+    return enumOptions(type, b);
 }
 
-class EnumInfo{
+export class EnumInfo{
     labelsMap = new Map<string,any>();
     values:any[]=[]
     labels:any[]=[]
@@ -508,7 +523,6 @@ export class Section extends controls.Composite {
         this.body.add(c);
     }
     renderContent(ch:HTMLElement){
-
         if (this.parent instanceof TabFolder){
             this._style.borderRadius="0px";
             this.heading._style.borderTopWidth="0px";
@@ -534,7 +548,7 @@ export class Section extends controls.Composite {
         super.renderChildren(ch)
     }
 
-    constructor(title: string = "") {
+    constructor(title: string = "",grabVertical:boolean=false) {
         super("div");
         this.setTitle(title);
         this.addClassName("panel")
@@ -550,13 +564,25 @@ export class Section extends controls.Composite {
         heading.add(this.toolbar);
         this._style.paddingBottom="0px"
         this._style.marginBottom="0px"
+        if (grabVertical){
+            this._style.display="flex";
+            this._style.flexDirection="column";
+            this._style.flex="1 1";
+        }
         this.heading = heading;
         super.add(heading)
         this.body.addClassName("panel-body");
+        if (grabVertical){
+            this.body._style.display="flex";
+            this.body._style.flexDirection="column";
+            this.body._style.flex="1 1";
+        }
         super.add(this.body);
-
     }
 }
+
+
+
 class RefreshOnChange implements IValueListener{
     constructor(private  c:AbstractListControl){
 
@@ -579,6 +605,9 @@ export abstract class AbstractListControl extends BindableControl implements ISe
     }
     removeSelectionListener(v:ISelectionListener){
         this.sl=this.sl.filter(x=>x!==v);
+    }
+    select(v:any){
+        this.setSelection([v]);
     }
 
     getSelection():any[]{
@@ -622,6 +651,7 @@ export abstract class AbstractListControl extends BindableControl implements ISe
 
         if (this._binding){
             this.selectionBinding._type=this._binding.collectionBinding().componentType();
+            this.selectionBinding.context=this._binding;
             this.prepareContent();
         }
     }
@@ -721,6 +751,43 @@ export class SimpleListControl extends AbstractListControl{
         rs.addLabel(lab);
         rs.onClick=()=>{
             this.setSelection([v]);
+        }
+        return rs;
+    }
+}
+export class ButtonMultiSelectControl extends AbstractListControl{
+
+    constructor(){
+        super("div")
+        //this.addClassName("list-group");
+    }
+    toControl(v:any): controls.IControl{
+        var lab=tps.service.label(v,this._binding.type());
+        var rs= new Button(lab);
+        rs._classNames=["btn","btn-xs","btn-primary"]
+        rs._style.margin="3px";
+        rs._style.cursor="pointer";
+        rs.onClick=()=>{
+            if (!this.isSelected(v)){
+                rs.removeClassName("btn-primary")
+                rs.addClassName("btn-success");
+                var mm=[v].concat(this.getSelection());
+                this.setSelection(mm);
+            }
+            else{
+                rs.addClassName("btn-primary")
+                rs.removeClassName("btn-success");
+                var mm=[].concat(this.getSelection());
+                mm=mm.filter(x=>x!=v);
+                this.setSelection(mm);
+
+            }
+        }
+        if (this.isSelected(v)){
+            rs.addClassName("btn-success");
+        }
+        else{
+            rs.addClassName("btn-primary");
         }
         return rs;
     }

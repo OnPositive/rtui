@@ -563,6 +563,9 @@ export class TreeView extends ViewPart {
 
     select(model: any) {
         var vs = $('#' + this.treeId).treeview(true);
+        if (!vs||!vs.all){
+            return;
+        }
         var n = findNode(vs.all(), model);
         if (n) {
             this.selection = [model];
@@ -672,6 +675,7 @@ export class TreeView extends ViewPart {
         this.treeId = treeId;
         var view = this;
         e.innerHTML = `<div id='${treeId}' style='${this.styleString}'></div>`;
+
         if (this.asyncRender){
             setTimeout(()=>this.renderTreeControl(treeId,view),200)
         }
@@ -1367,8 +1371,6 @@ export class BackAction implements IContributionItem {
     }
 
 }
-
-
 var w:any=window;
 w.WorkbenchUtils={};
 w.WorkbenchUtils.getView=getView;
