@@ -1098,7 +1098,7 @@ export class Application implements controls.IControl {
         this.nb.setTitle(this.title());
         var tmplt = `<div style="height: 100%;display: flex;flex-direction: column">
         <div id="${nb}"></div>    
-        <div id="${main}" style="flex: 1 0 0;height: 100%;display: flex;flex-direction: column"></div>
+        <div id="${main}" style="flex: 1 0 0;display: flex;flex-direction: column;"></div>
         <div>
             <p class="navbar-text" id="${status}" style="margin: 0px;padding: 0px;float: right;">...</p>
         </div>
@@ -1108,7 +1108,14 @@ export class Application implements controls.IControl {
         this.page = new Page(main);
         this.page.app = this;
         this.status = document.getElementById(status);
+        function resize() {
+            var r0 = document.getElementById(nb).getBoundingClientRect();
+            var r1 = document.getElementById(status).getBoundingClientRect();
+            document.getElementById(main).style.height = "" + (e.getBoundingClientRect().height - r0.height - r1.height - 3) + "px";
+        }
+        resize();
         this.openViews();
+        window.onresize=resize;
     }
 
     private openViews() {
