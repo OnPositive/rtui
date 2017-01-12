@@ -324,6 +324,11 @@ const skillType = {
     required: false,
     default: 0
 }
+const groupType={
+    type: "integer",
+    instanceValidator:"this==6||this==8||this==10",
+    errorMessage:"${displayName} group sum should be 6, 8 or 10"
+}
 const Party = {
     name: "Party of characters",
     description: "Group",
@@ -342,13 +347,12 @@ const Party = {
 
                         cabal: "string",
                         essense: "string",
-
                         strengh: attrType,
                         dexterity: attrType,
                         stamina: attrType,
                         physical:{
-                            type: "integer",
-                            computeFunction:"this.dexterity+this.stamina+this.strengh"
+                            type: groupType,
+                            computeFunction:"this.dexterity+this.stamina+this.strengh",
                         },
 
                         charisma: attrType,
@@ -356,7 +360,7 @@ const Party = {
                         appearance: attrType,
 
                         social:{
-                            type: "integer",
+                            type: groupType,
                             computeFunction:"this.charisma+this.manipulation+this.appearance"
                         },
 
@@ -365,7 +369,7 @@ const Party = {
                         width: attrType,
 
                         mental:{
-                            type: "integer",
+                            type: groupType,
                             computeFunction:"this.perception+this.intelligence+this.width"
                         },
                         talents:{
@@ -382,10 +386,13 @@ const Party = {
                         },
                         backgrounds:{
                             type: "map",
+                            description:"Additional backgrounds of the character",
                             componentType: skillType
                         },
                         totalAttrs:{
                             type: "integer",
+                            instanceValidator:"this==(6+8+10)",
+                            errorMessage:"Attribute groups should have 6,8,10 points spent",
                             computeFunction:"this.physical+this.social+this.mental"
                         },
                     },

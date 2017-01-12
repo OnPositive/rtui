@@ -127,6 +127,7 @@ const ArrayControlFactory: IControlFactory = {
             cmm.add(bm)
             return cmm;
         }
+        r.setDescription(b.type().description)
         var lst:forms.AbstractListControl = new forms.SimpleListControl();
         var props=tps.service.visibleProperties(b.collectionBinding().componentType());
 

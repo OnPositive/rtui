@@ -5,6 +5,7 @@ export interface IControl {
     render(e: Element);
     dispose?();
     title(): string;
+    description?(): string
     id(): string
     controlId?: string
     contextActions?: IContributionItem[]
@@ -244,6 +245,22 @@ export class Composite extends AbstractComposite {
     }
     private lifecycle:LifeCycleListener[]=[];
 
+    protected _description:string
+    setDescription(d:string){
+        this._description=d;
+    }
+
+    description(){
+        if (!this._description){
+            if (this.children.length==1){
+                if (this.children[0].description) {
+                    return this.children[0].description();
+                }
+            }
+        }
+        return this._description;
+    }
+
     addLifycleListener(l:LifeCycleListener){
         this.lifecycle.push(l)
     }
@@ -358,13 +375,17 @@ export class Composite extends AbstractComposite {
         }
 
         this.extraRender(ch);
-        if (!this.visible){
-            (<HTMLElement>this._element).style.display="none";
-        }
+
         ch["$control"]=this;
         this.renderChildren(ch);
         if (this._footer){
             this._footer.render(ch);
+        }
+        if (!this.visible){
+            (<HTMLElement>this._element).style.display="none";
+        }
+        if(this.disabled){
+            this.innerSetDisabled(this.disabled)
         }
     }
     _footer: IControl
@@ -745,13 +766,19 @@ export class HorizontalTabFolder extends Composite {
 
     innerRender(e: Element) {
         var f = new Form();
+        f._style.overflow="auto"
         //f._style.height = "100%"
         //f._style.overflow="auto"
         var vv = new VerticalFlex();
         //vv.wrapStyle.height = "100%";
         var m = new HorizontalFlex();
+        m.addClassName("panel")
+        m.addClassName("panel-default")
         //vv._style.height = "100%"
         m._style.flex = "1 1 auto"
+        vv._style.flex = "1 1 auto"
+        vv._style.margin="0px"
+        m._style.margin="0px"
         //m._style.backgroundColor="gray"
         //m._style.height = "100%"
         var view = this;
@@ -759,7 +786,30 @@ export class HorizontalTabFolder extends Composite {
 
 
         if (true) {
+            var view=this;
             var t = new forms.SimpleListControl();
+            if (this.parent) {
+                t.addControlCustomizer({
+                    customize(c, i, v){
+                        if (i == view.children.length - 1) {
+                            (<Composite>c)._style.borderBottomWidth = "0px";
+                        }
+                    }
+                })
+            }
+            t.addLabelCustomizer({
+                customize(c, i, v){
+                    var desc=(<Composite>v).description();
+                    if (desc){
+                        (<Composite>c)._style.whiteSpace="nowrap";
+                        (<Composite>c).add(new forms.Help(desc));
+                    }
+                }
+            })
+            t.style().borderRight="solid"
+            t.style().borderRightWidth="1px"
+            t.style().borderRightColor="#ddd"
+
             //t.styleString = "overflow: auto;flex: 1 1 0; min-height: 50px;height: 100%;display: block;background: lightgray; min-width:200px"
             m.add(t);
             m.add(f);

@@ -143,7 +143,6 @@ export class EditAction extends CollectionAction{
 export class CommitValidAction extends BindingDependentAction implements IValueListener{
 
     title: string
-    disabled: boolean=false;
     primary: boolean
 
     constructor(private  b: Binding,private onOk:()=>void){

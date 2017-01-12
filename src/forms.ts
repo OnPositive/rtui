@@ -231,6 +231,7 @@ export class Help extends controls.Composite {
         super("span")
         this.addClassName("glyphicon")
         this.addClassName("glyphicon-question-sign")
+        this._style.paddingLeft="3px";
         this.attrs["data-toggle"] = "tooltip"
         this.attrs["data-placement"] = "right"
         this.attrs.title = value;
@@ -546,7 +547,7 @@ export class Section extends controls.Composite {
     body: Composite= new controls.WrapComposite("div");
 
 
-    protected description: string;
+
 
 
     add(c: IControl) {
@@ -621,6 +622,9 @@ class RefreshOnChange implements IValueListener{
         this.c.dataRefresh();
     }
 }
+export interface  IControlCustomizer{
+    customize(c:IControl,i:number,data:any);
+}
 
 export abstract class AbstractListControl extends BindableControl implements ISelectionProvider{
 
@@ -629,6 +633,22 @@ export abstract class AbstractListControl extends BindableControl implements ISe
     private selection:any=[];
 
     selectionBinding:tps.Binding=new tps.Binding("selection");
+    customizers:IControlCustomizer[]=[];
+
+    addControlCustomizer(c:IControlCustomizer){
+        this.customizers.push(c);
+    }
+    removeControlCustomizer(c:IControlCustomizer){
+        this.customizers=this.customizers.filter(x=>x!=c);
+    }
+    labelCustomizers:IControlCustomizer[]=[];
+
+    addLabelCustomizer(c:IControlCustomizer){
+        this.labelCustomizers.push(c);
+    }
+    removeLabelCustomizer(c:IControlCustomizer){
+        this.labelCustomizers=this.customizers.filter(x=>x!=c);
+    }
 
     addSelectionListener(v:ISelectionListener){
         this.sl.push(v);
@@ -639,6 +659,7 @@ export abstract class AbstractListControl extends BindableControl implements ISe
     select(v:any){
         this.setSelection([v]);
     }
+
 
     getSelection():any[]{
         return this.selection;
@@ -732,8 +753,12 @@ export abstract class AbstractListControl extends BindableControl implements ISe
             this.children.push(body);
             contentB=body;
         }
+        var i=0;
         ac.forEach(x => {
-            contentB.children.push(this.toControl(x));
+            var cc=this.toControl(x,i);
+            this.customizers.forEach(c=>c.customize(cc,i,x))
+            i++;
+            contentB.children.push(cc);
         })
         var hasRemovals=false;
         var newSelection:any[]=[];
@@ -760,7 +785,7 @@ export abstract class AbstractListControl extends BindableControl implements ISe
         this.refresh();
     }
 
-    abstract toControl(v:any):controls.IControl;
+    abstract toControl(v:any,position:number):controls.IControl;
 }
 import uif=require("./uifactory")
 import {ISelectionProvider, ISelectionListener} from "./workbench";
@@ -772,7 +797,7 @@ export class SimpleListControl extends AbstractListControl{
         super("ul")
         this.addClassName("list-group");
     }
-    toControl(v:any): controls.IControl{
+    toControl(v:any,position): controls.IControl{
         var lab=tps.service.label(v,this._binding.type());
         var rs= new Composite("li")
         rs.addClassName("list-group-item")
@@ -780,7 +805,9 @@ export class SimpleListControl extends AbstractListControl{
         if (this.isSelected(v)){
             rs.addClassName("active");
         }
-        rs.addLabel(lab);
+        var label=rs.addLabel(lab);
+
+        this.labelCustomizers.forEach(x=>x.customize(label,position,v));
         rs.onClick=()=>{
             this.setSelection([v]);
         }
