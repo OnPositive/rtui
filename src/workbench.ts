@@ -28,7 +28,7 @@ import {DropDown} from "./forms";
 declare var require: any
 
 
-var Split: (a, b)=>void = require("../lib/Split").Split
+var Split: (a, b) => void = require("../lib/Split").Split
 
 export class LayoutPart implements ILayoutPart {
 
@@ -79,7 +79,7 @@ export interface IPartHolder {
     setToolbar(m: IMenu);
     setContextMenu(m: IMenu);
     setStatusMessage(message: string)
-    updateTitle(t:string);
+    updateTitle(t: string);
 }
 
 export interface IWorkbenchPart extends controls.IControl {
@@ -107,11 +107,11 @@ export class Pane implements IPartHolder {
 
     toolbarContentElement: Element;
     panelElement: Element
-    drop=new DropDown();
+    drop = new DropDown();
 
     setContextMenu(m: IMenu) {
-        this.drop.items=m.items;
-        if (m.items.length>0) {
+        this.drop.items = m.items;
+        if (m.items.length > 0) {
             this.drop.renderElement(null);
         }
     }
@@ -141,13 +141,14 @@ export class Pane implements IPartHolder {
         this._v = v;
         this.render();
     }
-    hid:string
+
+    hid: string
 
     render() {
         var hid = nextId();
         var bid = nextId();
         var mid = nextId();
-        this.hid=hid;
+        this.hid = hid;
         var menuId = nextId();
 
         var cmenuInnerId = nextId();
@@ -165,7 +166,7 @@ export class Pane implements IPartHolder {
 
         this.viewMenuButton = document.getElementById(mid)
         var bel = document.getElementById(bid);
-        this.panelElement=bel.parentElement;
+        this.panelElement = bel.parentElement;
         if (this._v) {
             this._v.render(bel);
         }
@@ -194,23 +195,24 @@ export class Pane implements IPartHolder {
                     }, 200)
             }
         }
-        this.drop.ownerId=cmenuInnerId;
-        if (this.drop.items.length>0){
+        this.drop.ownerId = cmenuInnerId;
+        if (this.drop.items.length > 0) {
             this.drop.renderElement(null);
         }
         handleResize();
 
     }
-    titleId:string
 
-    updateTitle(newTitle:string){
-        document.getElementById(this.titleId).innerText=newTitle;
+    titleId: string
+
+    updateTitle(newTitle: string) {
+        document.getElementById(this.titleId).innerText = newTitle;
     }
 
     private updateHeader(searchId: string, tid: string, mid: string, menuId: string) {
         var hel = document.getElementById(this.hid);
-        var tid2=nextId();
-        this.titleId=tid2;
+        var tid2 = nextId();
+        this.titleId = tid2;
         var headerHtml = `<div style="display: flex;flex-direction: row;width: 100%"><div id='${tid2}'style="flex:1 1 auto">${this._v.title()}</div>`
         var searchHtml = `<input type="text"style="color: black;border-radius: 3px;height: 23px;margin-right: 4px" id="${searchId}"/>`
         if (!this._v.searchable) {
@@ -230,7 +232,7 @@ export class ContributionManager {
 
     menu: IMenu = {items: []}
 
-    constructor(private onChange: (m: IMenu)=>void) {
+    constructor(private onChange: (m: IMenu) => void) {
 
     }
 
@@ -240,7 +242,7 @@ export class ContributionManager {
     }
 
     remove(item: IContributionItem) {
-        this.menu.items = this.menu.items.filter(x=>x != item);
+        this.menu.items = this.menu.items.filter(x => x != item);
         this.onChange(this.menu);
     }
 
@@ -255,7 +257,7 @@ var nh = {
     },
     setStatusMessage(m: string){
     },
-    updateTitle(s:string){
+    updateTitle(s: string){
 
     }
 };
@@ -284,9 +286,9 @@ export abstract class ViewPart implements IWorkbenchPart, ISelectionProvider {
     protected selection: any[] = []
 
 
-    protected contextMenu: ContributionManager = new ContributionManager(m=>this.holder.setContextMenu(m));
-    protected toolbar: ContributionManager = new ContributionManager(m=>this.holder.setToolbar(m));
-    protected viewMenu: ContributionManager = new ContributionManager(m=>this.holder.setViewMenu(m));
+    protected contextMenu: ContributionManager = new ContributionManager(m => this.holder.setContextMenu(m));
+    protected toolbar: ContributionManager = new ContributionManager(m => this.holder.setToolbar(m));
+    protected viewMenu: ContributionManager = new ContributionManager(m => this.holder.setViewMenu(m));
 
     protected setStatusMessage(m: string) {
         this.holder.setStatusMessage(m);
@@ -312,13 +314,13 @@ export abstract class ViewPart implements IWorkbenchPart, ISelectionProvider {
         this.selectionListeners.push(l);
     }
 
-    setTitle(t:string){
-        this._title=t;
+    setTitle(t: string) {
+        this._title = t;
         this.holder.updateTitle(t);
     }
 
     removeSelectionListener(l: ISelectionListener) {
-        this.selectionListeners = this.selectionListeners.filter(x=>x != l);
+        this.selectionListeners = this.selectionListeners.filter(x => x != l);
     }
 
     getSelection() {
@@ -327,7 +329,7 @@ export abstract class ViewPart implements IWorkbenchPart, ISelectionProvider {
 
     protected onSelection(v: any[]) {
         this.selection = v;
-        this.selectionListeners.forEach(x=>x.selectionChanged(v));
+        this.selectionListeners.forEach(x => x.selectionChanged(v));
     }
 
     constructor(private _id, private _title) {
@@ -352,17 +354,18 @@ export abstract class ViewPart implements IWorkbenchPart, ISelectionProvider {
     render(e: Element) {
         this.contentElement = e;
         this.innerRender(e);
-        (<any>e).view=this;
+        (<any>e).view = this;
     }
 
-    hide(){
-        if (this.contentElement){
-            (<HTMLElement>this.contentElement).style.display="none"
+    hide() {
+        if (this.contentElement) {
+            (<HTMLElement>this.contentElement).style.display = "none"
         }
     }
-    show(){
-        if (this.contentElement){
-            (<HTMLElement>this.contentElement).style.display="visible"
+
+    show() {
+        if (this.contentElement) {
+            (<HTMLElement>this.contentElement).style.display = "visible"
         }
     }
 
@@ -378,17 +381,16 @@ export abstract class ViewPart implements IWorkbenchPart, ISelectionProvider {
         this.contentElement = null;
     }
 }
-export function getView(e:Element):ViewPart{
-    while (e){
-        var vl:any=e;
-        if (vl.view){
+export function getView(e: Element): ViewPart {
+    while (e) {
+        var vl: any = e;
+        if (vl.view) {
             return vl.view;
         }
-        e=e.parentElement;
+        e = e.parentElement;
     }
     return null;
 }
-
 
 
 declare var $: any;
@@ -406,7 +408,7 @@ export interface ITreeContentProvider {
 }
 function buildTreeNode(x: any, t: ITreeContentProvider, l: ILabelProvider, selection: any[]) {
 
-    var nodes = t.children(x).map(n=>buildTreeNode(n, t, l, selection));
+    var nodes = t.children(x).map(n => buildTreeNode(n, t, l, selection));
     if (nodes.length == 0) {
         nodes = undefined;
     }
@@ -464,25 +466,25 @@ export class ContentProviderProxy implements ITreeContentProvider {
     }
 
     elements(x: any) {
-        var rs: any[] = this._inner.elements(x).filter(x=> {
+        var rs: any[] = this._inner.elements(x).filter(x => {
             var accept = true;
-            this.filters.forEach(x=>accept = accept && x.accept(x));
+            this.filters.forEach(x => accept = accept && x.accept(x));
             return accept;
         })
         if (this.sorter) {
-            return rs.sort((x, y)=>this.sorter.compare(x, y))
+            return rs.sort((x, y) => this.sorter.compare(x, y))
         }
         return rs;
     }
 
     children(x: any) {
-        var rs = this._inner.children(x).filter(x=> {
+        var rs = this._inner.children(x).filter(x => {
             var accept = true;
-            this.filters.forEach(x=>accept = accept && x.accept(x));
+            this.filters.forEach(x => accept = accept && x.accept(x));
             return accept;
         })
         if (this.sorter) {
-            return rs.sort((x, y)=>this.sorter.compare(x, y))
+            return rs.sort((x, y) => this.sorter.compare(x, y))
         }
         return rs;
     }
@@ -544,7 +546,7 @@ export class TreeView extends ViewPart {
     input: any;
     treeNodes: INode[];
     searchable = true;
-    asyncRender:boolean;
+    asyncRender: boolean;
 
     setSorter(s: IComparator) {
         this.contentProvider.sorter = s;
@@ -558,13 +560,13 @@ export class TreeView extends ViewPart {
     }
 
     removeFilter(f: IFilter) {
-        this.contentProvider.filters = this.contentProvider.filters.filter(x=>x != f);
+        this.contentProvider.filters = this.contentProvider.filters.filter(x => x != f);
         this.refresh();
     }
 
     select(model: any) {
         var vs = $('#' + this.treeId).treeview(true);
-        if (!vs||!vs.all){
+        if (!vs || !vs.all) {
             return;
         }
         var n = findNode(vs.all(), model);
@@ -575,7 +577,7 @@ export class TreeView extends ViewPart {
         }
     }
 
-    public expand(l:number){
+    public expand(l: number) {
         var vs = $('#' + this.treeId).treeview(true);
         vs.expandNode(0);
     }
@@ -606,8 +608,8 @@ export class TreeView extends ViewPart {
     constructor(id, title) {
         super(id, title);
         this.setContentProvider(new ArrayContentProvider());
-        this.labelProvider={
-            label(e:any){
+        this.labelProvider = {
+            label(e: any){
                 return e;
             }
         }
@@ -669,7 +671,7 @@ export class TreeView extends ViewPart {
         this.refresh();
     }
 
-    styleString:string="width:100%;overflow: auto;flex: 1 1 0; min-height: 50px;display: block"
+    styleString: string = "width:100%;overflow: auto;flex: 1 1 0; min-height: 50px;display: block"
 
     innerRender(e: Element) {
         var treeId = nextId();
@@ -677,21 +679,22 @@ export class TreeView extends ViewPart {
         var view = this;
         e.innerHTML = `<div id='${treeId}' style='${this.styleString}'></div>`;
 
-        if (this.asyncRender){
-            setTimeout(()=>this.renderTreeControl(treeId,view),200)
+        if (this.asyncRender) {
+            setTimeout(() => this.renderTreeControl(treeId, view), 200)
         }
         else {
             this.renderTreeControl(treeId, view);
         }
     }
 
-    autoExpand:number
-    private renderTreeControl(treeId:string, view:TreeView) {
+    autoExpand: number
+
+    private renderTreeControl(treeId: string, view: TreeView) {
         $('#' + treeId).treeview({
             data: this.getTree(), expandIcon: "glyphicon glyphicon-chevron-right",
             onNodeSelected: function (x) {
                 var sel = $('#' + treeId).treeview("getSelected");
-                view.onSelection(sel.map(x=>x.original))
+                view.onSelection(sel.map(x => x.original))
             },
             onNodeExpanded: function (x) {
                 var sel = $('#' + treeId).treeview("getSelected");
@@ -702,16 +705,16 @@ export class TreeView extends ViewPart {
             collapseIcon: "glyphicon glyphicon-chevron-down", borderColor: "0xFFFFFF", levels: 0
         });
         var sel = $('#' + treeId).treeview("getSelected");
-        if (this.autoExpand){
+        if (this.autoExpand) {
             this.expand(this.autoExpand)
         }
-        view.onSelection(sel.map(x=>x.original))
+        view.onSelection(sel.map(x => x.original))
     }
 
     getTree() {
         if (this.input && this.contentProvider && this.labelProvider) {
             var els = this.contentProvider.elements(this.input);
-            var nodes = els.map(x=>buildTreeNode(x, this.contentProvider, this.labelProvider, this.selection));
+            var nodes = els.map(x => buildTreeNode(x, this.contentProvider, this.labelProvider, this.selection));
             this.treeNodes = <INode[]>nodes;
             return nodes;
         }
@@ -827,7 +830,7 @@ export abstract class AccorditionTreeView extends ViewPart {
         var num = 0;
         var index = -1;
         var selectedIndexIsOk = false;
-        this.control.children.forEach(x=> {
+        this.control.children.forEach(x => {
             if (x instanceof TreeView) {
                 var has = x.onSearch(searchStr);
                 if (searchStr.length > 0) {
@@ -858,9 +861,9 @@ export abstract class AccorditionTreeView extends ViewPart {
 
     public setSelection(o: any) {
 
-        var sel=this.getSelection();
-        if (sel){
-            if (sel[0]==o){
+        var sel = this.getSelection();
+        if (sel) {
+            if (sel[0] == o) {
                 return;
             }
         }
@@ -879,8 +882,7 @@ export abstract class AccorditionTreeView extends ViewPart {
     protected abstract customize(tree: TreeView);
 
 
-
-    showTab(title:string) {
+    showTab(title: string) {
         for (var i = 0; i < this.control.children.length; i++) {
             if (this.control.children[i].title().toLowerCase() == title.toLowerCase() || this.control.children[i].controlId == title) {
                 this.control.expandIndex(i);
@@ -920,14 +922,14 @@ export interface INavBarTheme {
     brandImageStyle: string
     brandRight?: string
 }
-var n=1;
+var n = 1;
 
-export var defaultNavBar={
+export var defaultNavBar = {
     style: ' margin-bottom: 5px;background-image: url(https://github.com/themes/midnight/images/nav-bg.gif)',
     brandImage: 'http://marketplace.eclipse.org/sites/default/files/styles/ds_medium/public/Logo110_80_1.png',
     brandImageHeight: '46px',
     brandImageStyle: 'margin-left: 2px;margin-top:2px;margin-right: 10px',
-    brandRight:`<a class="header-logo-invertocat" href="https://github.com/apiregistry/registry" 
+    brandRight: `<a class="header-logo-invertocat" href="https://github.com/apiregistry/registry" 
                    aria-label="Homepage" >
                    <img src="./images/GitHub-Mark-Light-32px.png" height="32" style="margin: 8px"/>
                 </a>`
@@ -936,8 +938,8 @@ export class NavBar implements controls.IControl {
 
     _title: string = "";
 
-    id(){
-        return 'n'+(n++);
+    id() {
+        return 'n' + (n++);
     }
 
     _theme: INavBarTheme = defaultNavBar
@@ -947,7 +949,7 @@ export class NavBar implements controls.IControl {
     }
 
     globalMenuElement: Element;
-    private globalMenu: ContributionManager = new ContributionManager(x=> {
+    private globalMenu: ContributionManager = new ContributionManager(x => {
         this.renderMenu();
     })
 
@@ -980,7 +982,7 @@ export class NavBar implements controls.IControl {
                          height="${this._theme.brandImageHeight}" style="${this._theme.brandImageStyle}"/>
                     
                     <a class="navbar-brand" href="#" >
-                    <span class="glyphicon glyphicon-home" onclick="Workbench.open('home')" style="display: ${this.homeDisplay?"visible":"none"}">
+                    <span class="glyphicon glyphicon-home" onclick="Workbench.open('home')" style="display: ${this.homeDisplay ? "visible" : "none"}">
                     </span>
                     ${this._title}
                     </a>
@@ -1014,17 +1016,18 @@ export interface IPerspective {
     actions: IContributionItem[];
     views: IViewRef[ ]
 
-    onOpen?: ()=>void
+    onOpen?: () => void
 }
-var a=1;
+var a = 1;
 export class Application implements controls.IControl {
 
 
     title() {
         return this._title;
     }
-    id(){
-        return "a"+(a++);
+
+    id() {
+        return "a" + (a++);
     }
 
     private nb: NavBar = new NavBar();
@@ -1032,9 +1035,9 @@ export class Application implements controls.IControl {
     private status: Element;
     private perspective: IPerspective;
 
-    constructor(private _title: string, private initialPerspective: IPerspective, element?: Element|string,currentP?:IPerspective,theme?:INavBarTheme) {
-        this.perspective = currentP?currentP:initialPerspective;
-        this.perspective.actions.forEach(a=>this.nb.getMenuBar().add(a))
+    constructor(private _title: string, private initialPerspective: IPerspective, element?: Element|string, currentP?: IPerspective, theme?: INavBarTheme) {
+        this.perspective = currentP ? currentP : initialPerspective;
+        this.perspective.actions.forEach(a => this.nb.getMenuBar().add(a))
         if (element) {
             if (typeof element == "string") {
                 this.render(document.getElementById(<string>element))
@@ -1043,24 +1046,24 @@ export class Application implements controls.IControl {
                 this.render(<Element>element)
             }
         }
-        var v=this;
+        var v = this;
         addCommand({
-            id:"home",
+            id: "home",
             run(){
                 v.home();
             }
         })
     }
 
-    currentPerspective(){
+    currentPerspective() {
         return this.perspective;
     }
 
-    homePerspective(){
+    homePerspective() {
         return this.initialPerspective;
     }
 
-    home(){
+    home() {
         this.openPerspective(this.initialPerspective)
     }
 
@@ -1076,8 +1079,8 @@ export class Application implements controls.IControl {
 
     openPerspective(perspective: IPerspective) {
         this.nb.getMenuBar().menu.items = [];
-        this._title=perspective.title;
-        this.perspective.actions.forEach(a=>this.nb.getMenuBar().add(a))
+        this._title = perspective.title;
+        this.perspective.actions.forEach(a => this.nb.getMenuBar().add(a))
         this.perspective = perspective;
         this.render(this.element);
     }
@@ -1089,11 +1092,11 @@ export class Application implements controls.IControl {
         var nb = nextId();
         var main = nextId();
         var status = nextId();
-        if (this.currentPerspective()!=this.initialPerspective){
-            this.nb.homeDisplay=true;
+        if (this.currentPerspective() != this.initialPerspective) {
+            this.nb.homeDisplay = true;
         }
-        else{
-            this.nb.homeDisplay=false;
+        else {
+            this.nb.homeDisplay = false;
         }
         this.nb.setTitle(this.title());
         var tmplt = `<div style="height: 100%;display: flex;flex-direction: column">
@@ -1113,14 +1116,15 @@ export class Application implements controls.IControl {
             var r1 = document.getElementById(status).getBoundingClientRect();
             document.getElementById(main).style.height = "" + (e.getBoundingClientRect().height - r0.height - r1.height - 3) + "px";
         }
+
         resize();
         this.openViews();
-        window.onresize=resize;
+        window.onresize = resize;
     }
 
     private openViews() {
 
-        this.perspective.views.forEach(v=> {
+        this.perspective.views.forEach(v => {
             this.page.addView(v.view, v.ref, v.ratio, v.relation);
         })
     }
@@ -1131,81 +1135,81 @@ declare var BootstrapDialog: any;
 
 export class ShowDialogAction implements IContributionItem {
 
-    constructor(public title, private control: controls.IControl|string, private buttons:IContributionItem[]=[]) {
+    constructor(public title, private control: controls.IControl|string, private buttons: IContributionItem[] = []) {
     }
 
     run() {
         var title = this.title
-        var bs=[];
-        var bNum=0;
-        this.buttons.forEach(x=>{
-            var csCl="";
-            if (x.primary){
-                csCl="btn-primary";
+        var bs = [];
+        var bNum = 0;
+        this.buttons.forEach(x => {
+            var csCl = "";
+            if (x.primary) {
+                csCl = "btn-primary";
             }
-            if (x.warning){
-                csCl="btn-warning";
+            if (x.warning) {
+                csCl = "btn-warning";
             }
-            if (x.success){
-                csCl="btn-success";
+            if (x.success) {
+                csCl = "btn-success";
             }
-            if (x.danger){
-                csCl="btn-danger";
+            if (x.danger) {
+                csCl = "btn-danger";
             }
             bs.push({
-                id:"b"+bNum,
-                label:x.title,
-                action: (dlg)=> {
+                id: "b" + bNum,
+                label: x.title,
+                action: (dlg) => {
                     dlg.close()
                     x.run();
                 },
-                cssClass:csCl
+                cssClass: csCl
             })
-            bNum=bNum+1;
+            bNum = bNum + 1;
         })
-        if (bs.length==0){
+        if (bs.length == 0) {
             bs.push({
                 label: "Close",
-                action: (dlg)=> {
+                action: (dlg) => {
                     dlg.close()
                 }
             });
         }
-        var dlgThis=this;
-        var lst:IValueListener={
-            valueChanged(c:ChangeEvent){
-                var index=dlgThis.buttons.indexOf(c.target);
-                var id="b"+index;
-                var btn=dlg.getButton(id);
-                var cm:IContributionItem=c.target;
-                if (cm.disabled){
+        var dlgThis = this;
+        var lst: IValueListener = {
+            valueChanged(c: ChangeEvent){
+                var index = dlgThis.buttons.indexOf(c.target);
+                var id = "b" + index;
+                var btn = dlg.getButton(id);
+                var cm: IContributionItem = c.target;
+                if (cm.disabled) {
                     btn.disable();
                 }
-                else{
+                else {
                     btn.enable();
                 }
             }
         }
         var dlg = BootstrapDialog.show({
             title: title, buttons: bs,
-            onhidden:()=>{
-                this.buttons.forEach(x=>{
-                    if ((<any>x).addListener){
+            onhidden: () => {
+                this.buttons.forEach(x => {
+                    if ((<any>x).addListener) {
                         (<any>x).removeListener(lst);
                     }
                 })
             }
         })
-        if (this.buttons.length>0){
-            this.buttons.forEach(x=>{
-                if ((<any>x).addListener){
+        if (this.buttons.length > 0) {
+            this.buttons.forEach(x => {
+                if ((<any>x).addListener) {
                     (<any>x).addListener(lst);
                 }
             })
-            for (var i=0;i<this.buttons.length;i++){
-                if (this.buttons[i].disabled){
-                    var id="b"+i;
-                    var btn=dlg.getButton(id);
+            for (var i = 0; i < this.buttons.length; i++) {
+                if (this.buttons[i].disabled) {
+                    var id = "b" + i;
+                    var btn = dlg.getButton(id);
                     btn.disable();
                 }
             }
@@ -1218,27 +1222,27 @@ export class ShowDialogAction implements IContributionItem {
         }
     }
 }
-export function showInDialog(title:string,control: controls.IControl|string,btns?:IContributionItem[]){
-    new ShowDialogAction(title,control,btns).run();
+export function showInDialog(title: string, control: controls.IControl|string, btns?: IContributionItem[]) {
+    new ShowDialogAction(title, control, btns).run();
 }
-export function selectDialog(title: string,description: string,func:(x:any)=>void, root:any[],lp?:ILabelProvider,cp:ITreeContentProvider=new ArrayContentProvider()){
-    if (!lp){
-        lp={
-            label(x:any){
-               if (x.name){
-                   if (typeof x.name==="function"){
-                       return x.name();
-                   }
-                   return x.name;
-               }
-                if (x.title){
-                    if (typeof x.title==="function"){
+export function selectDialog(title: string, description: string, func: (x: any) => void, root: any[], lp?: ILabelProvider, cp: ITreeContentProvider = new ArrayContentProvider()) {
+    if (!lp) {
+        lp = {
+            label(x: any){
+                if (x.name) {
+                    if (typeof x.name === "function") {
+                        return x.name();
+                    }
+                    return x.name;
+                }
+                if (x.title) {
+                    if (typeof x.title === "function") {
                         return x.title();
                     }
                     return x.title;
                 }
-                if (x.id){
-                    if (typeof x.id==="function"){
+                if (x.id) {
+                    if (typeof x.id === "function") {
                         return x.id();
                     }
                     return x.id;
@@ -1247,28 +1251,28 @@ export function selectDialog(title: string,description: string,func:(x:any)=>voi
 
         }
     }
-    var tree=new TreeView("","");
-    tree.asyncRender=true
-    tree.autoExpand=2;
+    var tree = new TreeView("", "");
+    tree.asyncRender = true
+    tree.autoExpand = 2;
     tree.setContentProvider(cp);
 
     tree.setLabelProvider(lp);
     tree.setInput(root);
-    var composite=new controls.VerticalFlex();
-    composite._style.maxHeight="700px"
-    tree.styleString+=";max-height:600px;min-height:600px"
+    var composite = new controls.VerticalFlex();
+    composite._style.maxHeight = "700px"
+    tree.styleString += ";max-height:600px;min-height:600px"
     composite.add(new Label(description));
     composite.add(tree);
-    showInDialog(title,composite,[
+    showInDialog(title, composite, [
         {
-            title:"Ok",
+            title: "Ok",
             run(){
                 func(tree.getSelection()[0]);
             }
         }
         ,
         {
-            title:"Cancel"
+            title: "Cancel"
         }
     ])
 }
@@ -1288,7 +1292,7 @@ export function registerHandler(f: UrlHandler) {
     handlers.push(f);
 }
 export function unregisterHandler(f: UrlHandler) {
-    handlers = handlers.filter(x=>x !== f);
+    handlers = handlers.filter(x => x !== f);
 }
 w.Workbench = {
 
@@ -1301,24 +1305,24 @@ export function back() {
 }
 
 
-var commands={}
+var commands = {}
 
 
-export function addCommand(ci:IContributionItem ){
-    commands[ci.id]=ci;
+export function addCommand(ci: IContributionItem) {
+    commands[ci.id] = ci;
 }
 
 export function processUrl(url: string) {
-    if (commands[url]){
+    if (commands[url]) {
         commands[url].run();
         return;
     }
-    var sState=true;
-    Object.keys(commands).forEach(x=>{
-        if (url.indexOf(x)==0){
-            url=url.substring(x.length);
+    var sState = true;
+    Object.keys(commands).forEach(x => {
+        if (url.indexOf(x) == 0) {
+            url = url.substring(x.length);
             commands[x].run(url);
-            sState=false;
+            sState = false;
         }
     })
     if (sState) {
@@ -1332,17 +1336,17 @@ export function processState(s: StateRecord) {
         }
     }
 }
-var currentHash:string=null;
+var currentHash: string = null;
 export var notifyState = function (s: StateRecord) {
-    if (history && history.pushState&&s.hash.indexOf('#')==0) {
-        if (currentHash&&s.hash.indexOf(currentHash)==0){
-            history.replaceState(s, "",s.hash);
+    if (history && history.pushState && s.hash.indexOf('#') == 0) {
+        if (currentHash && s.hash.indexOf(currentHash) == 0) {
+            history.replaceState(s, "", s.hash);
 
         }
         else {
             history.pushState(s, "", s.hash);
         }
-        currentHash=s.hash;
+        currentHash = s.hash;
     }
 };
 export function setState(s: StateRecord) {
@@ -1355,22 +1359,22 @@ if (history && history.pushState) {
         if (event.state) {
             processState(event.state)
         }
-        else{
-            processState({hash:document.location.hash})
+        else {
+            processState({hash: document.location.hash})
         }
     };
 }
-export function exportGlobalHandler(name:string, handler:()=>void){
-    var w: any=window;
-    w[name]=handler;
+export function exportGlobalHandler(name: string, handler: () => void) {
+    var w: any = window;
+    w[name] = handler;
 }
 
 export class BackAction implements IContributionItem {
 
-    title:string
+    title: string
 
-    constructor(){
-        this.title="Back"
+    constructor() {
+        this.title = "Back"
 
     }
 
@@ -1379,6 +1383,6 @@ export class BackAction implements IContributionItem {
     }
 
 }
-var w:any=window;
-w.WorkbenchUtils={};
-w.WorkbenchUtils.getView=getView;
+var w: any = window;
+w.WorkbenchUtils = {};
+w.WorkbenchUtils.getView = getView;

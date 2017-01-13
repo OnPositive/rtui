@@ -85,6 +85,13 @@ export abstract class BindableControl extends controls.Composite {
         if (m.visibleWhen){
             visible=visible&&tps.calcCondition(m.visibleWhen,this._binding);
         }
+        var vl=this._binding.type();
+        if ((<any>vl).discriminateCondition){
+            var cond:string[]=(<any>vl).discriminateCondition;
+            if (this._binding.parent()){
+                visible=visible&&this._binding.parent().binding(cond[0]).get()==cond[1];
+            }
+        }
         if (m.hiddenWhen){
             visible=visible&&!tps.calcCondition(m.hiddenWhen,this._binding)
         }
@@ -92,8 +99,9 @@ export abstract class BindableControl extends controls.Composite {
         var disabled=false;
         if (m.disabledWhen){
             disabled=tps.calcCondition(m.disabledWhen,this._binding);
-
         }
+
+
         if (tps.service.isReadonly(this._binding.type())){
             disabled=true;
         }

@@ -197,6 +197,71 @@ const StringArray: IExample = {
     renderingOptions: {},
     category: "Forms"
 }
+const StringArrayUniqueItems: IExample = {
+    name: "String Array(Unique items)",
+    description: "Group",
+    editType: {
+        id: "Group",
+        type: "object",
+        properties: {
+            name: {type: "string", required: true},
+            members: {
+                type: {
+                    type: "array",
+                    itemType: {
+                        type: "string",
+                        minLength: 1
+                    },
+                    uniqueItems:true
+                },
+                default: ["A", "B", "C"]
+            },
+            leader: {
+                type: "string",
+                enumValues: "$.members",
+                required: true
+            }
+        }
+    },
+    renderingOptions: {},
+    category: "Forms"
+}
+const ObjectArrayUniqueKeys: IExample = {
+    name: "Object Array(Unique items)",
+    description: "Group",
+    editType: {
+        id: "Group",
+        type: "object",
+        properties: {
+            name: {type: "string", required: true},
+            members: {
+                type: {
+                    type: "array",
+                    itemType: {
+                        type: "object",
+                        properties:{
+                            name:{
+                                type: "string",
+                                unique: true
+                            },
+                            x:"integer",
+                            y:"integer"
+                        }
+                    },
+
+                },
+
+            },
+            leader: {
+                type: "string",
+                enumValues: "$.members",
+                required: true
+            }
+        }
+    },
+    renderingOptions: {},
+    category: "Forms"
+}
 const StringMap: IExample = {
     name: "Group (Map)",
     description: "Group",
@@ -310,6 +375,107 @@ const InnerType = {
     renderingOptions: {},
     category: "Forms"
 }
+const SimpleUnion = {
+    name: "Union Type(type or array of type)",
+    description: "Group",
+    editType: {
+        id: "Issue (Inner object type)",
+        type: "object",
+        properties: {
+            title: {type: "string", required: true},
+            options: {
+                type: "union",
+                options: ["string",
+                    {
+                        type:"array",
+                        itemType:"string"
+                    }
+                ]
+            }
+        }
+    },
+    renderingOptions: {},
+    category: "Forms"
+}
+const SimpleUnion1 = {
+    name: "Union Type(scalar)",
+    description: "Group",
+    editType: {
+        id: "Issue (Inner object type)",
+        type: "object",
+        properties: {
+            title: {type: "string", required: true},
+            options: {
+                type: "union",
+                options: ["string","number"]
+            }
+        }
+    },
+    renderingOptions: {},
+    category: "Forms"
+}
+const Thing={
+    type:"object",
+    id:"thing",
+    properties:{
+        kind:"string",
+        name: "string",
+        owned: "boolean"
+    },
+    discriminator:"kind",
+    required: ["name","kind"]
+}
+const Animal={
+    type:Thing,
+    id:"animal",
+    properties:{
+        kind:"string",
+        food: "string"
+    },
+    discriminator:"kind"
+}
+const Vehicle={
+    type:Thing,
+    id:"vehicle",
+    properties:{
+        fuel: "string",
+        maxSpeed: "number"
+    },
+    discriminator:"kind"
+}
+const VehicleOrAnimal={
+    type:"union",
+    options: [Vehicle,Animal]
+}
+
+const SimpleUnion2= {
+    name: "Union Type (object)",
+    description: "Group",
+    editType: VehicleOrAnimal,
+    renderingOptions: {},
+    category: "Forms"
+}
+const SimpleUnion3= {
+    name: "Array of unions",
+    description: "Group",
+    editType: {
+        id: "Issue (Inner object type)",
+        type: "object",
+        properties: {
+            title: {type: "string", required: true},
+            options: {
+                type: "array",
+                itemType: {
+                    type:"union",
+                    options: ["string", "number"]
+                }
+            }
+        }
+    },
+    renderingOptions: {},
+    category: "Forms"
+}
+
 const attrType = {
     type: "number",
     minimum: 1,
@@ -324,6 +490,8 @@ const skillType = {
     required: false,
     default: 0
 }
+
+
 const groupType={
     type: "integer",
     instanceValidator:"this==6||this==8||this==10",
@@ -374,6 +542,10 @@ const Party = {
                         },
                         talents:{
                             type: "map",
+                            keyType:{
+                                type:"string",
+                                enum: ["Brawl","Dodge","Expression","Intimidation","Leadership","Alerness","Awareness"]
+                            },
                             componentType: skillType
                         },
                         knowledges:{
@@ -417,6 +589,12 @@ var examples = [
     TypeAheadExample,
     StringArray,
     StringMap,
+    StringArrayUniqueItems,
+    ObjectArrayUniqueKeys,
+    SimpleUnion,
+    SimpleUnion1,
+    SimpleUnion2,
+    SimpleUnion3,
     Issue,
     InnerType,
     Party

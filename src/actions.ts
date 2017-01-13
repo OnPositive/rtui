@@ -103,8 +103,9 @@ export class CreateAction extends CollectionAction{
         nn.value=ni;
         nn._type=tp.service.resolvedType({
             id:"",
+            //displayName:this.selection.type().displayName,
             required: true,
-            type: this.selection.type()
+            type: sr
         });
         var v=this;
         dialog("Create "+sr.displayName,nn,()=>{
@@ -129,9 +130,10 @@ export class EditAction extends CollectionAction{
         var nn=new tp.Binding("");
         nn.context=this.selection;
         nn.value=tp.service.workingCopy(this.selection.get(),this.selection.type());
-        nn._type=tp.service.resolvedType({
+        nn._type=tp.service.resolvedType(<any>{
             id:"",
             required: true,
+            uniquinessException:this.selection.get(),
             type: this.selection.type()
         });
         var v=this;
