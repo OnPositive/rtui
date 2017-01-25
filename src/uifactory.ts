@@ -9,13 +9,13 @@ import {Binding} from "raml-type-bindings";
 
 
 export interface RenderingContext {
-    maxLength?: number
+
     tabsTop?: boolean
     horizontalBooleans?: boolean,
     dialog?: boolean
     noStatus?:boolean
+    noStatusDecorations?:boolean
 }
-
 
 interface IControlFactory {
     createControl?(b: IBinding, r?: RenderingContext);
@@ -49,94 +49,12 @@ const UnionControlFactory: IControlFactory = {
         var allMap=true;
         u.options.forEach(x=>{
             allScalar=x&&tps.service.isScalar(tps.service.resolvedType(x));
-            allObject=x&&tps.service.isObject(tps.service.resolvedType(x));
-            allArray=x&&tps.service.isArray(tps.service.resolvedType(x));
-            allMap=x&&tps.service.isMap(tps.service.resolvedType(x));
         });
         if (allScalar){
             return StringControlFactory.createControl(b);
         }
-        if (allObject){
-            var rs=tps.copy(u);
-            rs.type="object";
-            var pmap:{ [name:string]:{[name:string]:tps.Property}}={};
-
-            //now lets try to gather discriminator
-            var discriminators:{ [name:string]:string[]}={}
-            u.options.forEach(v=>{
-                var rt=tps.service.resolvedType(v);
-                var allProps=tps.service.allProperties(rt);
-                allProps.forEach(c=>{
-
-                    var rmap=pmap[c.id];
-                    if (!rmap){
-                        rmap={};
-                        pmap[c.id]=rmap;
-                    }
-                    if (c.id=="name") {
-                        console.log(tps.hash(c.type));
-                    }
-                    rmap[tps.hash(c.type)]=c;
-                })
-                var mm=(<any>rt).discriminator;
-                if (mm){
-                    var dd=discriminators[mm]
-                    if (!dd){
-                        dd=[];
-                        discriminators[mm]=dd;
-                    }
-                    var vl=(<any>rt).discriminatorValue;
-                    if (!vl){
-                        vl=rt.id
-                    };
-                    dd.push(vl);
-                }
-            })
-            var ps:{ [name:string]:tps.TypeReference}={};
-            Object.keys(pmap).forEach(k=>{
-                var cand=pmap[k];
-                if (Object.keys(cand).length==1){
-                    ps[k]=cand[Object.keys(cand)[0]];
-                }
-                else{
-                    ps[k]={
-                        id: k,
-                        type:"union"
-
-                    };
-                    (<any>ps[k]).options=Object.keys(cand).map(v=>cand[v]);
-                }
-                if (discriminators[k]){
-                    (<any>ps[k]).enum=discriminators[k];
-                    (<any>ps[k]).required=true;
-                }
-                else{
-                    Object.keys(cand).forEach(x=>{
-                        var t=cand[x].declaredAt;
-                        if ((<tps.ObjectType>t).discriminator){
-                            var vl=(<tps.ObjectType>t).discriminatorValue;
-                            if (!vl){
-                                vl=t.id;
-                            }
-                            (<any>cand[x]).discriminateCondition=[(<tps.ObjectType>t).discriminator,vl];
-                        }
-                    })
-                }
-            });
-
-            (<any>rs).properties=ps;
-            var newB:Binding=new Binding(b.id());
-            newB._parent=<tps.Binding>b.parent();
-            newB._id=b.id();
-            newB.value=b.get();
-            delete (<any>rs).options;
-            delete (<any>rs).createControl;
-            newB._type=tps.service.resolvedType(rs);
-            return service.createControl(newB,r);
-        }
         var s = new controls.Composite("span");
         s.addLabel("Can not represent type: "+u.displayName);
-        //1. check if array;
         return s;
     }
 }
@@ -150,9 +68,7 @@ const StringControlFactory: IControlFactory = {
         var nAddon = new forms.InputGroupAddOn();
         r._style.width = "100%";
         r.add(nAddon)
-        if (rc && rc.maxLength) {
-            nAddon._style.width = rc.maxLength + "ch";
-        }
+
         nAddon._style.textAlign = "left"
         var ll = new controls.Composite("span");
         var gtitle=b.type().displayName + (b.type().required ? "* " : " ");
@@ -212,6 +128,9 @@ const StringControlFactory: IControlFactory = {
         return r;
     }
 }
+const MasterDetailsControlFactory: IControlFactory = {
+
+}
 const ArrayControlFactory: IControlFactory = {
     createControl(b: IBinding, rc?: RenderingContext){
         var r = new forms.Section(b.type().displayName,true);
@@ -239,6 +158,7 @@ const ArrayControlFactory: IControlFactory = {
             lst=tb;
         }
         lst._binding = b;
+        lst.selectionBinding._type=b.collectionBinding().componentType()
         var items=[
             new actions.CreateAction(b, lst.selectionBinding),
             new actions.EditAction(b, lst.selectionBinding),
@@ -248,7 +168,15 @@ const ArrayControlFactory: IControlFactory = {
         var dr=new forms.DropDown();
         dr.items=items;
         dr.addTo(lst);
-        r.add(lst);
+        if (props.length>3){
+            var md=new forms.MasterDetails(lst);
+            r.body._style.padding="0px";//
+            r.body._style.paddingRight="3px";//
+            r.add(md)
+        }
+        else {
+            r.add(lst);
+        }
         return r;
     }
 }
@@ -328,36 +256,33 @@ export class DisplayManager {
         var result = new controls.VerticalFlex();
         result._style.flex="1 1 auto";
         result.setTitle(g.caption);
-        if (needStatus) {
+        if (!r){
+            r={
+                noStatus:!needStatus,
+                noStatusDecorations:true
+            }
+        }
+        if (needStatus||(!r.noStatusDecorations)) {
             let rnd = new forms.StatusRender();
+            if (!needStatus){
+                rnd.displayMessage=false;
+            }
+            if (r.noStatusDecorations){
+                rnd.displayDecorations=false;
+            }
             rnd._binding = b;
             result.add(rnd)
         }
         if (!r) {
             r = {};
         }
-        if (!r.maxLength) {
-            r.maxLength = 5;
-        }
-        g.properties.forEach(x => {
-            if (tps.service.isScalar(x)) {
-                if (r.maxLength < x.displayName.length) {
-                    r.maxLength = x.displayName.length;
-                }
-            }
-        })
-        if (r.maxLength < 10) {
-            r.maxLength = 12;
-        }
-        g.properties.forEach(x => {
 
+        g.properties.forEach(x => {
             var o = this.copyContext(r);
             o.dialog = false;
             o.noStatus=true;
             result.add(this.createControl(b.binding(x.id), o));
-
         });
-
         return result;
     }
 }

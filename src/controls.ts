@@ -1,4 +1,4 @@
-import {IValueListener, Binding} from "raml-type-bindings";
+import {IValueListener, Binding, error} from "raml-type-bindings";
 declare var require: any
 require("../lib/bootstrap-treeview")
 export interface IControl {
@@ -146,15 +146,52 @@ export class Context {
 }
 var c = 1;
 
+
+export interface HasChildValidnessDecorations {
+    setChildValidness(valid:boolean[]);
+}
 export abstract class AbstractComposite implements IControl {
 
     private _title: string;
 
     children: IControl[] = []
-    parent: IControl;
+    parent: AbstractComposite;
     protected _element: Element;
     protected _id: string;
 
+    setDisabled(v:boolean){
+        return;
+    }
+
+    canShrinkVertically():boolean{
+        return false;
+    }
+
+    hasVerticalSchrink(){
+        if (this.canShrinkVertically()){
+            return true;
+        }
+        if(this.parent&&this.parent instanceof AbstractComposite){
+            return (<AbstractComposite>this.parent).canShrinkVertically();
+        }
+        return false;
+    }
+    canShrinkChildrenVertically(){
+        var can=true;
+        if (this.children.length==0){
+            return false;//atomic controls are not shrinkable FIXME
+        }
+        this.children.forEach(x=>{
+            if (x instanceof AbstractComposite){
+                can=can&&(x.canShrinkVertically()||x.hasVerticalSchrink());
+            }
+        })
+        return can
+    }
+
+    completeRefresh(c:AbstractComposite){
+        this._element.replaceChild(<Element>c.render(this._element),c._element);
+    }
 
     id() {
         if (this._id) {
@@ -166,7 +203,7 @@ export abstract class AbstractComposite implements IControl {
 
     render(e: Element) {
         this._element = e;
-        this.innerRender(e);
+        return this.innerRender(e);
     }
 
     refresh() {
@@ -186,6 +223,10 @@ export abstract class AbstractComposite implements IControl {
     remove(c: IControl) {
         this.children = this.children.filter(x => x != c);
         this.refresh();
+    }
+
+    potentiallyVisible(){
+        this.children.forEach(x=>{(<AbstractComposite>x).potentiallyVisible()});
     }
 
     dispose() {
@@ -261,6 +302,8 @@ export class Composite extends AbstractComposite {
         return this._description;
     }
 
+
+
     addLifycleListener(l:LifeCycleListener){
         this.lifecycle.push(l)
     }
@@ -270,6 +313,7 @@ export class Composite extends AbstractComposite {
 
     onAttach(e:Element){
         this.lifecycle.forEach(x=>x.attached(this,e))
+        this.potentiallyVisible();
     }
     onDetach(e:Element){
         this.lifecycle.forEach(x=>x.detached(this,e))
@@ -285,12 +329,19 @@ export class Composite extends AbstractComposite {
     _classNames: string[] = []
 
     _text: string
+    _html: string
 
 
 
     addLabel(l: string) {
         var cnt = new Composite("span");
         cnt._text = l;
+        this.add(cnt);
+        return cnt;
+    }
+    addHTML(l: string) {
+        var cnt = new Composite("span");
+        cnt._html = l;
         this.add(cnt);
         return cnt;
     }
@@ -311,10 +362,14 @@ export class Composite extends AbstractComposite {
         this._className = c;
         return this;
     }
+    tag(){
+       return this.tagName;
+    }
 
     protected innerRender(e: Element) {
-        var ch = document.createElement(this.tagName)
+        var ch = document.createElement(this.tag())
         e.appendChild(ch);
+
         this._element=ch;
         this.renderContent(ch);
     }
@@ -327,7 +382,7 @@ export class Composite extends AbstractComposite {
     }
     private visible: boolean=true;
     setVisible(visible:boolean){
-        if (this.parent.weapperForChild){
+        if (this.parent&&(<any>this.parent).weapperForChild){
             if ((<Composite>this.parent).setVisible) {
                 (<Composite>this.parent).setVisible(visible)
             }
@@ -350,6 +405,10 @@ export class Composite extends AbstractComposite {
 
     onClick?:(m:MouseEvent)=>void;
 
+    needsVerticalScroll(){
+        return this.hasVerticalSchrink()&&!this.canShrinkChildrenVertically();
+    }
+
     protected renderContent(ch: HTMLElement) {
         ch.id = this.id();
         if (this._styleString) {
@@ -370,10 +429,15 @@ export class Composite extends AbstractComposite {
         if (this._text) {
             ch.innerText = this._text;
         }
+        if (this._html) {
+            ch.innerHTML = this._html;
+        }
         if (this.onClick){
              ch.onclick=this.onClick;
         }
-
+        if (this.needsVerticalScroll()){
+            ch.style.overflowY="auto";
+        }
         this.extraRender(ch);
 
         ch["$control"]=this;
@@ -465,6 +529,40 @@ export class VerticalFlex extends Composite {
 
     wrapStyle: CSSStyleDeclaration = <any>{}
 
+
+    potentiallyVisible(){
+        setTimeout(e=> {
+            this.resize();
+        },50);
+        this.resize();
+        super.potentiallyVisible();
+    }
+
+    private resize() {
+        var maxSize = 0;
+        this.children.forEach(x => {
+            if (x instanceof forms.InputGroup) {
+                var ic = <forms.InputGroup>x;
+                if (ic.children[0] instanceof forms.InputGroupAddOn) {
+                    var iadd = <forms.InputGroupAddOn>ic.children[0];
+                    var w = iadd.width();
+                    if (w > maxSize) {
+                        maxSize = w;
+                    }
+                }
+            }
+        })
+        this.children.forEach(x => {
+            if (x instanceof forms.InputGroup) {
+                var ic = <forms.InputGroup>x;
+                if (ic.children[0] instanceof forms.InputGroupAddOn) {
+                    var iadd = <forms.InputGroupAddOn>ic.children[0];
+                    iadd.setWidth(maxSize + 5);//
+                }
+            }
+        })
+    }
+
     protected wrap(p: HTMLElement,c?: IControl) {
         if (c instanceof Composite){
             return p;
@@ -474,6 +572,9 @@ export class VerticalFlex extends Composite {
         p.appendChild(d);
         return d;
     }
+    canShrinkVertically():boolean{
+        return true;
+    }
 }
 
 var globalId = 0;
@@ -482,7 +583,28 @@ function nextId() {
 }
 export class Loading extends AbstractComposite {
     protected innerRender(e: Element) {
-        e.innerHTML = `<div style="display: flex;flex: 1 1 0; flex-direction: column;justify-content: center;"><div style="display: flex;flex-direction: row;justify-content: center"><div><div>Loading...</div><img src='./lib/progress.gif'/></div></div></div>`
+        e.innerHTML = `<div style="display: flex;flex: 1 1 0; flex-direction: column;justify-content: center;"><div style="display: flex;flex-direction: row;justify-content: center"><div><div>Loading...</div><img src='https://petrochenko-pavel-a.github.io/raml-explorer/lib/progress.gif'/></div></div></div>`
+    }
+}
+export class Loading2 extends Composite {
+
+    constructor(){
+        super("div");
+        this._styleString="display: flex;flex: 1 1 0; flex-direction: column;justify-content: center;";
+    }
+
+    protected innerRender(e: Element) {
+        e.innerHTML = `<div style="display: flex;flex-direction: row;justify-content: center"><div><div>Loading...</div><img src='https://petrochenko-pavel-a.github.io/raml-explorer/lib/progress.gif'/></div></div>`
+    }
+}
+export class Error  extends AbstractComposite {
+
+    constructor(private message:string,private cb:()=>void){super();}
+
+    protected innerRender(e: Element) {
+
+        e.innerHTML = `<div style="display: flex;flex: 1 1 0; flex-direction: column;justify-content: center;"><div style="display: flex;flex-direction: row;justify-content: center"><div class="danger" style="max-width: 60%">Error: ${this.message} (<a href="#">Retry...</a>)</div></div></div>`;
+        (<HTMLElement>this._element).onclick=(x)=>{this.cb()}
     }
 }
 export class Label extends AbstractComposite {
@@ -507,7 +629,11 @@ export class ErrorMessage extends AbstractComposite{
     _message:string
 
     setMessage(m:string){
+        if (m.length>100){
+            m=m.substring(0,70)+'...';
+        }
         this._message=m;
+
         this.refresh();
     }
     getMessage(){
@@ -764,6 +890,16 @@ export class SourceCode extends Composite{
 }
 export class HorizontalTabFolder extends Composite {
 
+    list: forms.SimpleListControl;
+    validness:boolean[]=[];
+
+    setChildValidness(validness:boolean[]){
+        this.validness=validness;
+         if (this.list){
+             this.list.dataRefresh();
+         }
+    }
+
     innerRender(e: Element) {
         var f = new Form();
         f._style.overflow="auto"
@@ -783,16 +919,16 @@ export class HorizontalTabFolder extends Composite {
         //m._style.height = "100%"
         var view = this;
         var hide = false;
-
-
         if (true) {
             var view=this;
             var t = new forms.SimpleListControl();
+            this.list=t;
             if (this.parent) {
                 t.addControlCustomizer({
                     customize(c, i, v){
                         if (i == view.children.length - 1) {
                             (<Composite>c)._style.borderBottomWidth = "0px";
+
                         }
                     }
                 })
@@ -803,6 +939,10 @@ export class HorizontalTabFolder extends Composite {
                     if (desc){
                         (<Composite>c)._style.whiteSpace="nowrap";
                         (<Composite>c).add(new forms.Help(desc));
+                    }
+                    if (view.validness[i]===false){
+                        (<Composite>c).addHTML(`<span class="alert-danger" style="background-color: transparent" role="alert">
+        <span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span> </span>`);
                     }
                 }
             })

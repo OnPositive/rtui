@@ -36,10 +36,14 @@ export class LayoutPart implements ILayoutPart {
 
     }
 
-    splitHorizontal(sizes: number[]): ILayoutPart[] {
+    splitHorizontal(sizes: number[],grabHorizonatal=false): ILayoutPart[] {
         var fid = nextId();
         var nid = nextId();
-        var content = `<div style="height: 100%"><div  id="${fid}" class="split split-horizontal" style="height: 100%"></div><div id="${nid}" class="split split-horizontal" style="height: 100%"></div></div>`;
+        var ss="height: 100%";
+        if (grabHorizonatal){
+            ss="width: 100%";
+        }
+        var content = `<div style="${ss}"><div  id="${fid}" class="split split-horizontal" style="height: 100%"></div><div id="${nid}" class="split split-horizontal" style="height: 100%"></div></div>`;
         this._el.innerHTML = content;
         var r1 = new LayoutPart(document.getElementById(fid));
         var r2 = new LayoutPart(document.getElementById(nid));
@@ -48,6 +52,14 @@ export class LayoutPart implements ILayoutPart {
             cursor: 'col-resize',
             sizes: sizes
         })
+        if (grabHorizonatal){
+            (<HTMLElement>r1.element()).style.display="flex";
+            (<HTMLElement>r1.element()).style.flexDirection="column";
+            (<HTMLElement>r1.element()).style.maxHeight="100%";
+            (<HTMLElement>r2.element()).style.display="flex";
+            (<HTMLElement>r2.element()).style.flexDirection="column";
+            (<HTMLElement>r2.element()).style.maxHeight="100%";
+        }
         return [r1, r2];
     }
 

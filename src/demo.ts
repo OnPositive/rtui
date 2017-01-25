@@ -4,8 +4,8 @@ import controls=require("./controls")
 import tps=require("raml-type-bindings")
 import  workbench=require("./workbench")
 import display=require("./uifactory")
-class DemoView extends workbench.TreeView {
-}
+class DemoView extends workbench.TreeView {}
+
 class Details extends workbench.ViewPart {
 
     input: any
@@ -430,7 +430,7 @@ const Animal={
     id:"animal",
     properties:{
         kind:"string",
-        food: "string"
+        food: { type:"string",required: true}
     },
     discriminator:"kind"
 }
@@ -439,7 +439,7 @@ const Vehicle={
     id:"vehicle",
     properties:{
         fuel: "string",
-        maxSpeed: "number"
+        maxSpeed:{ type:"number",required: true}
     },
     discriminator:"kind"
 }
@@ -475,13 +475,39 @@ const SimpleUnion3= {
     renderingOptions: {},
     category: "Forms"
 }
+const SimpleUnion4= {
+    name: "Union of arrays",
+    description: "Group",
+    editType: {
+        id: "Issue (Inner object type)",
+        type: "object",
+        properties: {
+            title: {type: "string", required: true},
+            options: {
+                type: "union",
+                options:[
+                    {
+                        type: "array",
+                        itemType:"string"
+                    }
+                    ,{
+                        type: "array",
+                        itemType:"number"
+                    }
+                ]
+            }
+        }
+    },
+    renderingOptions: {},
+    category: "Forms"
+}
 
 const attrType = {
     type: "number",
     minimum: 1,
     maximum: 5,
     required: false,
-    default: 1
+    default: 2
 }
 const skillType = {
     type: "number",
@@ -497,20 +523,24 @@ const groupType={
     instanceValidator:"this==6||this==8||this==10",
     errorMessage:"${displayName} group sum should be 6, 8 or 10"
 }
+
+
 const Party = {
     name: "Party of characters",
     description: "Group",
     editType: {
         id: "Issue (Inner object type)",
         type: "object",
+
         properties: {
             name: {type: "string", required: true},
+
             characters: {
                 type: "array",
                 itemType: {
                     type: "object",
                     properties: {
-                        name: {type: "string", required: true},
+                        name: {type: "string", required: true, unique: true},
                         concept: "string",
 
                         cabal: "string",
@@ -565,14 +595,15 @@ const Party = {
                             type: "integer",
                             instanceValidator:"this==(6+8+10)",
                             errorMessage:"Attribute groups should have 6,8,10 points spent",
-                            computeFunction:"this.physical+this.social+this.mental"
+                            computeFunction:"this.physical+this.social+this.mental",
                         },
                     },
                     propertyGroups: {
                         "Physical Attributes": ["strengh", "dexterity", "stamina","physical"],
                         "Social Attributes": ["charisma", "appearance", "manipulation","social"],
                         "Mental Attributes": ["perception","intelligence","width","mental"]
-                    }
+                    },
+                    hiddenProperties:["totalAttrs"]
                 }
             }
         }
@@ -582,7 +613,101 @@ const Party = {
 }
 
 
+const Types = {
+    name: "Types Library",
+    description: "Group",
+    editType: {
+        id: "Issue (Inner object type)",
+        type: "object",
 
+        properties: {
+            name: {type: "string", required: true},
+            types: {
+                type: "map",
+                componentType: {
+                    type: "object",
+                    properties: {
+                        description: { type: "string", required: true},
+                        superTypes:{
+                            type:"array",
+                            itemType: "string"
+                        },
+                        properties:{
+                            type: "map",
+                            componentType:{ type:"string", displayName:"Type"}
+                        }
+                    },
+                }
+            }
+        }
+    },
+    renderingOptions: {},
+    category: "Forms"
+}
+const Github = {
+    name: "Github",
+    description: "Group",
+    editType: {
+        id: "Issue (Inner object type)",
+        type: "object",
+        properties: {
+            //name: "string",
+            issues:{
+                type: "relation",
+
+                location:"https://api.github.com/search/issues?q=RAML&sort=updated",
+                paging: true,
+                pageNumberPointer:"page",
+                results:"items",
+                total:"total_count",
+                errorIn:"message",
+
+                itemType:{
+                    type: "object",
+                    icon:"https://maxcdn.icons8.com/office/PNG/16/Animals/bug-16.png",
+                    properties:{
+                        title: "string",
+                        repository_url:"string",
+                        labels:"string",
+                        created_at:"date",
+                        updated_at:"date",
+                        comments:"integer",
+                        body:"markdown",
+                        comments_url:{
+                            type:"relation",
+                            displayName:"Comments",
+                            errorIn:"message",
+                            itemType:{
+                                type:"object",
+                                icon:"https://maxcdn.icons8.com/Color/PNG/24/Business/comments-24.png",
+                                properties:{
+
+                                    created_at: "date",
+                                    updated_at: "date",
+                                    body:"markdown",
+                                    user:{
+                                        type:"object",
+                                        properties:{
+                                            login: "string",
+                                            avatar_url:"string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    propertyGroups:{
+                      "Body":["body"],
+                      "Comments":["comments_url"],
+                    }
+                },
+                columns:["title","comments","created_at","updated_at"]
+            }
+        }
+    },
+    renderingOptions: {},
+    category: "Forms"
+}
 var examples = [
     SimplePerson,
     Enums,
@@ -595,9 +720,12 @@ var examples = [
     SimpleUnion1,
     SimpleUnion2,
     SimpleUnion3,
+    SimpleUnion4,
     Issue,
     InnerType,
-    Party
+    Party,
+    Types,
+    Github
 ]
 
 var dv = new DemoView("List of Demos", "Demo")
@@ -605,7 +733,7 @@ dv.setInput(examples)
 dv.setLabelProvider({
 
     label(a: any){
-        return a.name;
+        return `<img src="https://maxcdn.icons8.com/Color/PNG/24/Travel/mess_tin-24.png"></img>`+a.name;
     }
 })
 var details = new Details("Example", "Example")

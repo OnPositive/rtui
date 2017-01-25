@@ -101,11 +101,12 @@ export class CreateAction extends CollectionAction{
         var nn=new tp.Binding("");
         nn.context=this.selection;
         nn.value=ni;
-        nn._type=tp.service.resolvedType({
+        nn._type=tp.service.resolvedType(<any>{
             id:"",
             //displayName:this.selection.type().displayName,
             required: true,
-            type: sr
+            type: sr,
+            uniquinessException:{}
         });
         var v=this;
         dialog("Create "+sr.displayName,nn,()=>{
