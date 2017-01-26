@@ -7,6 +7,7 @@ import IPropertyGroup=tps.ts.IPropertyGroup;
 import {RadioSelect} from "./forms";
 import {Binding} from "raml-type-bindings";
 
+declare const marked:any
 
 export interface RenderingContext {
 
@@ -184,6 +185,15 @@ const ArrayControlFactory: IControlFactory = {
 tps.declareMeta(tps.TYPE_SCALAR, StringControlFactory);
 tps.declareMeta(tps.TYPE_ARRAY, ArrayControlFactory);
 tps.declareMeta(tps.TYPE_MAP, ArrayControlFactory);
+
+tps.declareMeta(tps.TYPE_MARKDOWN,<tps.metakeys.Label>{
+
+    label(v: string){
+        return marked(v);
+    },
+
+    htmlLabel: true
+})
 export class DisplayManager {
 
     createControl(b: IBinding, r?: RenderingContext): controls.IControl {

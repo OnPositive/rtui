@@ -650,17 +650,41 @@ export class MasterDetails extends controls.HorizontalFlex{
 
     useSplit=true;
 
+
+    spEl:HTMLElement;
     onAttach(e:Element){
         if (this.useSplit){
             var lp=new workbench.LayoutPart(this._element);
-            var lps=lp.splitHorizontal([50,50],true);
 
+            var lps=lp.splitHorizontal([50,50],true);
+            this.spEl=<HTMLElement>lp.element();
+            (<HTMLElement>lps[0].element()).style.maxHeight="100%";
+            (<HTMLElement>lps[1].element()).style.maxHeight="100%";
             var  v=new VerticalFlex();
+            v._style.flex="1 1 0";
+            v._style.overflow="hidden";
             v.add(this.lst);//
             v.render(lps[0].element());
             this.createDetails(this.lst).render(lps[1].element());
         }
         super.onAttach(e);
+    }
+    potentiallyVisible(){
+        if (this.useSplit&&this.spEl&&this.spEl.children[0]){
+            if((<any>this.spEl.children[0]).onresize) {
+                setTimeout(()=>{
+                    let pair = (<any>this.spEl.children[0]).pairs[0];
+                    (<HTMLElement>pair.a).style.width=(this.spEl.children[0].clientWidth/2-pair.aGutterSize)+"px";
+                    (<HTMLElement>pair.b).style.width=(this.spEl.children[0].clientWidth/2-pair.bGutterSize)+"px";
+                    pair.calculateSizes.call(pair);
+                    pair.fitMin.call(pair);
+                    pair.rebalance.call(pair);
+                },50)
+
+//
+            }//
+        }
+        super.potentiallyVisible();
     }
 
     constructor(private lst:AbstractListControl){
@@ -1034,6 +1058,19 @@ export abstract class AbstractListControl extends BindableControl implements ISe
         }
         return super.tag();
     }
+    protected addLabel(v: any, rs: Composite,t: tps.Type) {
+        var lab = tps.service.label(v, t);
+        if (!lab){
+            lab="";
+        }
+        if ((<tps.metakeys.Label>t).htmlLabel){
+            rs.addHTML(lab);
+        }
+        else {
+            var label = rs.addLabel(lab);
+        }
+        return label;
+    }
 
     visitInner(v:tps.Status){
         if (v){
@@ -1305,7 +1342,7 @@ export class SimpleListControl extends AbstractListControl{
     }
 
     toControl(v:any,position): controls.IControl{
-        var lab=tps.service.label(v,this._binding.type());
+
         var rs= new Composite("li")
         rs.addClassName("list-group-item")
         rs.addClassName("noRoundBorder")
@@ -1313,7 +1350,7 @@ export class SimpleListControl extends AbstractListControl{
         if (this.isSelected(v)){
             rs.addClassName("active");
         }
-        var label=rs.addLabel(lab);
+        var label = this.addLabel(v, rs,this._binding.collectionBinding().componentType());
         if (this.hasError(position)){
             rs.addHTML(ERROR);
         }
@@ -1323,6 +1360,8 @@ export class SimpleListControl extends AbstractListControl{
         }
         return rs;
     }
+
+
 }
 export class ButtonMultiSelectControl extends AbstractListControl{
 
@@ -1537,12 +1576,8 @@ export class TableControl extends AbstractListControl{
             if (i==0&&(<tps.metakeys.Icon>this._binding.collectionBinding().componentType()).icon){
                 td.addHTML(`<img style="margin-right: 4px" src="${(<tps.metakeys.Icon>this._binding.collectionBinding().componentType()).icon}"></img>`)
             }
-            var val=tps.service.label(tps.service.getValue(p.type,v,p.id),p.type);
-            if (!val){
-                val="";
-            }
-            //adding label
-            td.addLabel(val);
+            this.addLabel(tps.service.getValue(p.type,v,p.id),td,p.type)
+
             if (i==0){
                 if (this.hasError(position)){
                     td.addHTML(ERROR);
