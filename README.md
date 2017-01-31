@@ -12,7 +12,7 @@ Unlike a component, a property editor analyzes metadata associated with a given 
 
 
 
-This fundamentally changes the way developers interact with a UI framework. Instead of writing UI by telling the system how to do something, the developer tells the system what they intend to accomplish. When using Sapphire, the developer says "I want to edit LastName property of the person object”. 
+This fundamentally changes the way developers interact with a UI framework. Instead of writing UI by telling the system how to do something, the developer tells the system what they intend to accomplish. When using Types UI, the developer says "I want to edit LastName property of the person object”. 
 
 When using widget toolkits like GXT, the developer says "create label, create text box, lay them out like so, configure their settings, setup data binding and so on". By the time the developer is done, it is hard to see the original goal in the code that's produced. This results in UI that is inconsistent, brittle and difficult to maintain.
 
