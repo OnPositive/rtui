@@ -69,9 +69,10 @@ export abstract class BindingDependentAction extends ListenableAction implements
 export abstract class CollectionAction extends  BindingDependentAction implements IContributionItem{
 
     title:string
-
-    constructor(protected _valBinding:IBinding,protected selection:IBinding){
-        super(selection)
+    protected selection:IBinding;
+    constructor(protected _valBinding:IBinding){
+        super(_valBinding.collectionBinding().selectionBinding());
+        this.selection=_valBinding.collectionBinding().selectionBinding();
         this.title=this.defaultTitle();
     }
     run(){
@@ -115,6 +116,40 @@ export class CreateAction extends CollectionAction{
     }
 }
 
+export class CreateWithConstructorAction extends CollectionAction{
+
+    title: string
+
+
+    constructor(protected _valBinding:IBinding,private constructor:tp.Operation){
+        super(_valBinding)
+    }
+
+    defaultTitle(){
+        return "Create";
+    }
+    isEnabled(){
+        return true;
+    }
+    run(){
+        var nn=new tp.OperationBinding(this.constructor,<tp.Binding>this._valBinding);
+        var v=this;
+        dialog(tp.service.caption(nn.type()),nn,()=>{
+            nn.execute(
+                (x:any)=>{
+                    if (x) {
+                        v._valBinding.add(x);
+                    }
+                    else{
+                        v._valBinding.refresh();
+                    }
+                }
+            );
+
+        });
+    }
+}
+
 export class EditAction extends CollectionAction{
 
 
@@ -140,6 +175,9 @@ export class EditAction extends CollectionAction{
         var v=this;
         dialog("Edit "+sr.displayName,nn,()=>{
                     v._valBinding.replace(v.selection.get(),nn.get());
+                    // v.selection.readonly=false
+                    // v.selection.set(nn.get());
+                    // v.selection.readonly=true
                 });
     }
 }
@@ -165,7 +203,7 @@ export class CommitValidAction extends BindingDependentAction implements IValueL
 }
 
 export function dialog(caption: string,b:Binding,onOk:()=>void){
-    wb.showInDialog(caption,uf.service.createControl(b,{dialog:true}),[
+    wb.showInDialog(caption,uf.service.createControl(b,{dialog:true,maxMasterDetailsLevel:0}),[
         new CommitValidAction(b,onOk),
         Cancel,
     ])

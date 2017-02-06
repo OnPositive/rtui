@@ -1,5 +1,5 @@
 {
-  "name": "raml-semantic-ui",
+  "name": "types-ui",
   "version": "0.0.6",
   "private": false,
   "main": "dist/app.js",

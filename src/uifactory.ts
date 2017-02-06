@@ -3,19 +3,16 @@ import tps=require("raml-type-bindings")
 import forms=require("./forms")
 import actions=require("./actions")
 import IBinding=tps.IBinding
+import ro=require("./renderingOptions")
 import IPropertyGroup=tps.ts.IPropertyGroup;
-import {RadioSelect} from "./forms";
+import {RadioSelect, StatusRender} from "./forms";
 import {Binding} from "raml-type-bindings";
 
 declare const marked:any
 
-export interface RenderingContext {
+export interface RenderingContext extends ro.RenderingOptions{
 
-    tabsTop?: boolean
-    horizontalBooleans?: boolean,
-    dialog?: boolean
-    noStatus?:boolean
-    noStatusDecorations?:boolean
+
 }
 
 interface IControlFactory {
@@ -64,10 +61,21 @@ tps.declareMeta(tps.TYPE_BOOLEAN, BooleanControlFactory);
 declare var $:any
 const StringControlFactory: IControlFactory = {
     createControl(b: IBinding, rc?: RenderingContext){
-
+        if (!b.accessControl().canEditSelf()){
+            var bl=new forms.BindedLabel("div");
+            bl._binding=b;
+            return bl;
+        }
         var r = new forms.InputGroup();
         var nAddon = new forms.InputGroupAddOn();
-        r._style.width = "100%";
+        if (rc.kind!="filter") {
+            r._style.width = "100%";
+        }
+        else{
+            r._style.maxWidth = "300px";
+            r._style.padding="0px"
+            r._style.marginRight="3px"//
+        }
         r.add(nAddon)
 
         nAddon._style.textAlign = "left"
@@ -80,9 +88,9 @@ const StringControlFactory: IControlFactory = {
         ll._style.cssFloat = "left";
         nAddon.add(ll);
         var mm: tps.FullTypeOptions = <any>b.type();
-        if (mm.enum || mm.enumValues) {
+        if ((mm.enum || mm.enumValues)) {
             if(mm.enum){
-                if (mm.enum.length<6) {
+                if (mm.enum.length<6&&rc.kind!="filter") {
                     var res = new RadioSelect()
                     res._binding = b;
                     return res;
@@ -94,6 +102,7 @@ const StringControlFactory: IControlFactory = {
         }
         else {
             var w: forms.TextArea|forms.Input = new forms.Input();
+
             if ((<tps.StringType>b.type()).multiline) {
                 w = new forms.TextArea();
                 w._style.minHeight = "200px";
@@ -108,7 +117,7 @@ const StringControlFactory: IControlFactory = {
                 w._binding = b;
                 var vm=new controls.Composite("div");
                 var s = new forms.Section(b.type().displayName,true)
-                s._style.margin = "5px";
+                //s._style.margin = "5px";
                 s.body._style.padding = "0px";
 
                 s.add(w);
@@ -129,12 +138,35 @@ const StringControlFactory: IControlFactory = {
         return r;
     }
 }
-const MasterDetailsControlFactory: IControlFactory = {
 
-}
 const ArrayControlFactory: IControlFactory = {
     createControl(b: IBinding, rc?: RenderingContext){
         var r = new forms.Section(b.type().displayName,true);
+
+        var params=(<tps.Operation>b.type()).parameters;
+        if (b instanceof  tps.ViewBinding) {
+            var ps=b.parameterBindings();
+            if (ps.length > 0) {
+
+                var hs = new controls.HorizontalFlex();
+                hs._style.display = "inline-flex"
+                var c = ro.clone(rc, {kind: "filter"});
+                ps.forEach(x => {
+                    if (b.lookupVar(x.id())) {
+                        x.set(b.lookupVar(x.id()));
+                    }
+                    else{
+                        hs.add(service.createControl(x, c));
+                    }
+                })
+                if (hs.children.length>0) {
+                    r.heading._style.padding = "5px"
+                    hs._style.cssFloat = "right"
+                    r.heading.add(hs);//
+                }
+                r.toolbar._style.marginTop = "3px";//
+            }
+        }
         if (tps.service.isMultiSelect(b.type())){
             var bm=new forms.ButtonMultiSelectControl();
             var ct=tps.service.componentType(b.type());
@@ -159,25 +191,38 @@ const ArrayControlFactory: IControlFactory = {
             lst=tb;
         }
         lst._binding = b;
-        lst.selectionBinding._type=b.collectionBinding().componentType()
-        var items=[
-            new actions.CreateAction(b, lst.selectionBinding),
-            new actions.EditAction(b, lst.selectionBinding),
-            new actions.DeleteAction(b, lst.selectionBinding),
-        ];
+        var items=[];
+        if (b.accessControl().supportsAdd()){
+            if (b.addOperation()){
+                items.push(new actions.CreateWithConstructorAction(b,b.addOperation()));
+            }
+            else {
+                items.push(new actions.CreateAction(b));
+            }
+        }
+        if (b.accessControl().supportsUpdate()){
+            items.push(new actions.EditAction(b));
+        }
+        if (b.accessControl().supportsRemove()){
+            items.push(new actions.DeleteAction(b));
+        }
         r.toolbar.items =items;
         var dr=new forms.DropDown();
         dr.items=items;
         dr.addTo(lst);
-        if (props.length>3){
+        let v=(v:boolean)=>{r.setVisible(v)};
+        if (props.length>1&&(rc.maxMasterDetailsLevel>0)){
             var md=new forms.MasterDetails(lst);
             r.body._style.padding="0px";//
             r.body._style.paddingRight="3px";//
             r.add(md)
+            md.onVisibilityChanged=v;
         }
         else {
             r.add(lst);
+            lst.onVisibilityChanged=v;
         }
+
         return r;
     }
 }
@@ -186,25 +231,65 @@ tps.declareMeta(tps.TYPE_SCALAR, StringControlFactory);
 tps.declareMeta(tps.TYPE_ARRAY, ArrayControlFactory);
 tps.declareMeta(tps.TYPE_MAP, ArrayControlFactory);
 
+var entityMap = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+    '/': '&#x2F;',
+    '`': '&#x60;',
+    '=': '&#x3D;'
+};
+
+function escapeHtml (string) {
+    return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+        return entityMap[s];
+    });
+}
 tps.declareMeta(tps.TYPE_MARKDOWN,<tps.metakeys.Label>{
 
     label(v: string){
+        if (!v){
+            return "";
+        }
         return marked(v);
+    },
+
+    htmlLabel: true
+})
+tps.declareMeta(tps.TYPE_BOOLEAN,<tps.metakeys.Label>{
+
+    cellSize: 1,
+
+    label(v: string){
+        if (!v) {
+            return "<span class='glyphicon glyphicon-unchecked'></span>"
+        }
+        return "<span class='glyphicon glyphicon-chevron-down'></span>"
+
     },
 
     htmlLabel: true
 })
 export class DisplayManager {
 
+    createOperationControl(op:tps.Operation,r?:RenderingContext):controls.IControl{
+        return new controls.Label(op.displayName);
+    }
+
     createControl(b: IBinding, r?: RenderingContext): controls.IControl {
         r = this.copyContext(r);
         var c = <IControlFactory><any>tps.service.resolvedType(b.type());
-        if (!b.get()) {
+        if (!b.get()&&b.get()!==false) {
             var dv = b.type().default
-            b.set(dv);
+            if (dv) {
+                b.set(dv);
+            }
         }
         if (c.createControl) {
             var tp = c.createControl(b, r);
+            tp.setRenderingOptions(r);
             if (r.dialog && !tps.service.isObject(b.type())) {
                 var result = new controls.VerticalFlex();
                 let rnd = new forms.StatusRender();
@@ -222,21 +307,25 @@ export class DisplayManager {
         if (groups.length == 1) {
             var group= this.renderGroup(b, groups[0], r, r.noStatus?false:true);
             group.setTitle(b.type().displayName);
+            group.setRenderingOptions(r);
             return group;
         }
         else {
             if (groups[0].properties.length < 6||true) {
                 var rs: controls.Composite = <controls.Composite>this.renderGroup(b, groups[0], r, true&&(!r.noStatus));
+                rs.setRenderingOptions(r);
                 var tf = groups.length<=4?new forms.TabFolder():new controls.HorizontalTabFolder("div");
                 tf._style.padding="5px";
                 for (var i = 1; i < groups.length; i++) {
-                    var ss: controls.IControl = this.renderGroup(b, groups[i]);
+                    var cm=ro.clone(r,{noStatus:true,noStatusDecorations:true})
+                    var ss: controls.IControl = this.renderGroup(b, groups[i],cm,false);
                     if (ss instanceof controls.VerticalFlex) {
                         if (ss.children.length == 1) {
                             var  vv=ss.children[0];
 
                             ss = vv;
                         }
+
                     }
                     tf.add(ss);
                 }
@@ -251,6 +340,12 @@ export class DisplayManager {
     }
 
     private copyContext(r: RenderingContext) {
+        var dfo=ro.defaultOptions();
+        Object.keys(dfo).forEach(x=>{
+            if (r[x]==undefined){
+                r[x]=dfo[x];
+            }
+        })
         if (r) {
             var o = {};
             Object.keys(r).forEach(x => o[x] = r[x])
@@ -262,7 +357,7 @@ export class DisplayManager {
         return r;
     }
 
-    renderGroup(b: IBinding, g: tps.ts.IPropertyGroup, r?: RenderingContext, needStatus: boolean = false) {
+    renderGroup(b: IBinding, g: tps.ts.IPropertyGroup, r?: RenderingContext, needStatus: boolean = false):controls.AbstractComposite {
         var result = new controls.VerticalFlex();
         result._style.flex="1 1 auto";
         result.setTitle(g.caption);
@@ -272,6 +367,7 @@ export class DisplayManager {
                 noStatusDecorations:true
             }
         }
+
         if (needStatus||(!r.noStatusDecorations)) {
             let rnd = new forms.StatusRender();
             if (!needStatus){
@@ -293,6 +389,14 @@ export class DisplayManager {
             o.noStatus=true;
             result.add(this.createControl(b.binding(x.id), o));
         });
+        if (result.children.length==2){
+            if (result.children[1] instanceof forms.Section&&result.children[0] instanceof StatusRender){
+
+                var rr=<forms.Section>result.children[1];
+                rr.add(result.children[0]);
+                return rr;
+            }
+        }
         return result;
     }
 }

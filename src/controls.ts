@@ -1,4 +1,6 @@
-import {IValueListener, Binding, error} from "raml-type-bindings";
+import {IValueListener, Binding} from "raml-type-bindings";
+import ro=require("./renderingOptions")
+
 declare var require: any
 require("../lib/bootstrap-treeview")
 export interface IControl {
@@ -159,6 +161,24 @@ export abstract class AbstractComposite implements IControl {
     protected _element: Element;
     protected _id: string;
 
+    _renderingOptions:ro.RenderingOptions;
+
+    setRenderingOptions(o:ro.RenderingOptions){
+        this._renderingOptions=ro.clone(o);
+    }
+    getRenderingOptions(){
+        if (!this._renderingOptions){
+            if (this.parent){
+                return this.parent.getRenderingOptions();
+            }
+            return ro.defaultOptions();
+        }
+        return this._renderingOptions
+    }
+    rendersLabel(c:IControl){
+        return false;
+    }
+
     setDisabled(v:boolean){
         return;
     }
@@ -272,12 +292,13 @@ export class Composite extends AbstractComposite {
         super()
     }
     protected disabled:boolean=false;
+
     setDisabled(v: boolean){
         if (this.disabled!=v){
             this.innerSetDisabled(v);
             this.disabled=v;
+            this.children.forEach(x=>x.setDisabled(v))
         }
-        this.children.forEach(x=>x.setDisabled(v))
     }
     protected  innerSetDisabled(v:boolean){
         if (this._element){
@@ -376,7 +397,7 @@ export class Composite extends AbstractComposite {
 
     refresh() {
         if (this._element) {
-            this._element.innerHTML = null;
+            this._element.innerHTML = "";
             this.renderContent(<HTMLElement>this._element);
         }
     }
@@ -389,20 +410,35 @@ export class Composite extends AbstractComposite {
         }
         if (visible!=this.visible){
             this.visible=visible;
-            if (this._element){
-                if (!visible){
-                    (<HTMLElement>this._element).style.display="none";
-                }
-                else{
-                    (<HTMLElement>this._element).style.display="";
-                }
+            this.innerUpdateVisible(visible);
+
+        }
+
+    }
+    dsStyle:string
+
+    protected innerUpdateVisible(visible: boolean) {
+        if (this._element) {
+            if (!visible) {
+                this.dsStyle=(<HTMLElement>this._element).style.display;
+                (<HTMLElement>this._element).style.display = "none";
+            }
+            else {
+                (<HTMLElement>this._element).style.display = this._style.display ? this._style.display : this.dsStyle;
+            }
+            if (this.onVisibilityChanged) {
+                this.onVisibilityChanged(visible);
+            }
+            if (this.parent && (<Composite>this.parent).onChildVisibilityChanged) {
+                (<Composite>this.parent).onChildVisibilityChanged(this, visible);
             }
         }
     }
     isVisible(){
         return this.visible;
     }
-
+    onChildVisibilityChanged?:(c,v:boolean)=>void;
+    onVisibilityChanged?:(v:boolean)=>void;
     onClick?:(m:MouseEvent)=>void;
 
     needsVerticalScroll(){
@@ -525,6 +561,11 @@ export class VerticalFlex extends Composite {
         super("div")
         this._style.display = "flex";
         this._style.flexDirection = "column"
+        this.onChildVisibilityChanged=(x)=>{
+            setTimeout(e=> {
+                this.resize();
+            },50);
+        }
     }
 
     wrapStyle: CSSStyleDeclaration = <any>{}
@@ -599,11 +640,12 @@ export class Loading2 extends Composite {
 }
 export class Error  extends AbstractComposite {
 
-    constructor(private message:string,private cb:()=>void){super();}
+    constructor(private message:string,private cb:()=>void,private canRetry:boolean,private rm:string="Retry..."){super();}
 
     protected innerRender(e: Element) {
 
-        e.innerHTML = `<div style="display: flex;flex: 1 1 0; flex-direction: column;justify-content: center;"><div style="display: flex;flex-direction: row;justify-content: center"><div class="danger" style="max-width: 60%">Error: ${this.message} (<a href="#">Retry...</a>)</div></div></div>`;
+        e.innerHTML = `<div style="display: flex;flex: 1 1 0; flex-direction: column;justify-content: center;"><div style="display: flex;flex-direction: row;justify-content: center">
+        <div class="alert-danger" style="max-width: 60%;background-color: transparent"><span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>${this.message} ${this.canRetry?`(<a href='#'>${this.rm}</a>)`:""}</div></div></div>`;
         (<HTMLElement>this._element).onclick=(x)=>{this.cb()}
     }
 }
@@ -845,6 +887,24 @@ if (!window.observer) {
 }
 import forms=require("./forms")
 import tps=require("raml-type-bindings")
+
+
+var entityMap = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+    '/': '&#x2F;',
+    '`': '&#x60;',
+    '=': '&#x3D;'
+};
+
+export function escapeHtml (string) {
+    return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+        return entityMap[s];
+    });
+}
 export class SourceCode extends Composite{
 
     _content:string;
@@ -878,7 +938,7 @@ export class SourceCode extends Composite{
 
     renderContent(e: HTMLElement) {
         if (!this._editable){
-            e.innerHTML="<code class='"+this._language+"'>"+this._content+"</code>";
+            e.innerHTML="<code class='"+this._language+"'>"+escapeHtml(this._content)+"</code>";
             var id=this.id();
             setTimeout(function () {
                 if (window.hljs) {
@@ -892,6 +952,10 @@ export class HorizontalTabFolder extends Composite {
 
     list: forms.SimpleListControl;
     validness:boolean[]=[];
+
+    rendersLabel(c:IControl){
+        return true;
+    }
 
     setChildValidness(validness:boolean[]){
         this.validness=validness;
