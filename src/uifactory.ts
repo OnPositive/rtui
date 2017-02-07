@@ -7,6 +7,7 @@ import ro=require("./renderingOptions")
 import IPropertyGroup=tps.ts.IPropertyGroup;
 import {RadioSelect, StatusRender} from "./forms";
 import {Binding} from "raml-type-bindings";
+import {Label} from "./controls";
 
 declare const marked:any
 
@@ -61,6 +62,9 @@ tps.declareMeta(tps.TYPE_BOOLEAN, BooleanControlFactory);
 declare var $:any
 const StringControlFactory: IControlFactory = {
     createControl(b: IBinding, rc?: RenderingContext){
+        if ((<tps.metakeys.Reference>b.type()).reference){
+            return referenceControl(b);
+        }
         if (!b.accessControl().canEditSelf()){
             var bl=new forms.BindedLabel("div");
             bl._binding=b;
@@ -170,13 +174,22 @@ const ArrayControlFactory: IControlFactory = {
         if (tps.service.isMultiSelect(b.type())){
             var bm=new forms.ButtonMultiSelectControl();
             var ct=tps.service.componentType(b.type());
-            var cl=new tps.Binding("");
-            cl.value=forms.enumOptions(ct,b);
-            cl._type=b.type();
+
+            var ll=tps.enumOptionsBinding(b.type(),b);
+            var cl:Binding;
+            if (ll){
+                cl=ll.collection;
+            }
+            else {
+                var cl = new tps.Binding("");
+                cl.value = forms.enumOptions(ct, b);
+                cl._type = b.type();
+            }
             bm._binding=cl;
-            bm.selectionBinding=<Binding>b;
+            tps.bidirectional(b,cl,ll.transformer,ll.btrasform);//
             var cmm=new controls.Composite("span")
-            cmm.setTitle(b.type().displayName);
+            cmm.setTitle(tps.service.caption(b.type()));
+            bm.setTitle(tps.service.caption(b.type()));
             cmm.add(bm)
             return cmm;
         }
@@ -272,6 +285,28 @@ tps.declareMeta(tps.TYPE_BOOLEAN,<tps.metakeys.Label>{
 
     htmlLabel: true
 })
+function referenceControl(b: IBinding) {
+    var bm = new forms.ButtonMultiSelectControl();
+    var ct = tps.service.componentType(b.type());
+    bm.setSingle(true)
+    var ll = tps.enumOptionsBinding(b.type(), b);
+    var cl: Binding;
+    if (ll) {
+        cl = ll.collection;
+    }
+    else {
+        var cl = new tps.Binding("");
+        cl.value = forms.enumOptions(ct, b);
+        cl._type = b.type();
+    }
+    bm._binding = cl;
+    tps.bidirectional(b, cl, ll.transformer, ll.btrasform);//
+    var cmm = new controls.Composite("span")
+    cmm.setTitle(tps.service.caption(b.type()));
+    bm.setTitle(tps.service.caption(b.type()));
+    cmm.add(bm)
+    return cmm;
+}
 export class DisplayManager {
 
     createOperationControl(op:tps.Operation,r?:RenderingContext):controls.IControl{
@@ -280,13 +315,14 @@ export class DisplayManager {
 
     createControl(b: IBinding, r?: RenderingContext): controls.IControl {
         r = this.copyContext(r);
-        var c = <IControlFactory><any>tps.service.resolvedType(b.type());
+        var c = <IControlFactory><any>b.type();
         if (!b.get()&&b.get()!==false) {
             var dv = b.type().default
             if (dv) {
                 b.set(dv);
             }
         }
+
         if (c.createControl) {
             var tp = c.createControl(b, r);
             tp.setRenderingOptions(r);
@@ -299,6 +335,9 @@ export class DisplayManager {
                 return result;
             }
             return tp;
+        }
+        if ((<tps.metakeys.Reference>b.type()).reference){
+            return referenceControl(b);
         }
         var groups = tps.service.propertyGroups(b.type());
         if (groups.length == 0) {

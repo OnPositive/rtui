@@ -1494,9 +1494,44 @@ export class ButtonMultiSelectControl extends AbstractListControl {
 
     constructor() {
         super("div")
+        this._style.paddingLeft="5px";
+        this._style.paddingRight="5px";
         //this.addClassName("list-group");
     }
 
+    updateFromValue(){
+        this._binding.refresh();
+    }
+    dataRefresh(){
+        this.contentPrepared=false;
+        this.refresh();
+    }
+    _single: boolean=false;
+    setSingle(single:boolean){
+        this._single=single;
+    }
+
+    needLabel(){
+        if (this.parent){
+            if (this.parent.rendersLabel(this)){
+                return false;
+            }
+        }
+        return true;
+    }
+    initBinding(c:HTMLElement){
+        if (!this.title()){
+            this.setTitle(tps.service.caption(this._binding.type()));
+        }
+        super.initBinding(c)
+    }
+
+    renderContent(ch:HTMLElement){
+        if (this.needLabel()){
+            ch.innerHTML="<span>"+this.title()+":</span>";
+        }
+        super.renderContent(ch);
+    }
     toControl(v: any): controls.IControl {
         var lab = tps.service.label(v, this._binding.type());
         var rs = new Button(lab);
@@ -1507,16 +1542,23 @@ export class ButtonMultiSelectControl extends AbstractListControl {
             if (!this.isSelected(v)) {
                 rs.removeClassName("btn-primary")
                 rs.addClassName("btn-success");
+
                 var mm = [v].concat(this.getSelection());
+                if (this._single){
+                    mm=[v];
+                }
                 this.setSelection(mm);
             }
             else {
+                if (this._single){
+                    this.setSelection([]);
+                    return;
+                }
                 rs.addClassName("btn-primary")
                 rs.removeClassName("btn-success");
                 var mm = [].concat(this.getSelection());
-                mm = mm.filter(x => x != v);
+                mm = mm.filter(x => !tps.service.isSame(x,v,this.componentType()));
                 this.setSelection(mm);
-
             }
         }
         if (this.isSelected(v)) {
@@ -1857,7 +1899,7 @@ export class BindedLabel extends BindableControl{
                 cnt=controls.escapeHtml(cnt);
             }
             if (this.needLabel()){
-                cnt="<b class='fieldCaption' style='display: inline'>"+this.title()+":</b><span class='fieldValue' style='margin-left: 5px'>"+cnt+"</span>";
+                cnt="<span class='fieldCaption' style='display: inline'>"+this.title()+":</span><span class='fieldValue' style='margin-left: 5px'>"+cnt+"</span>";
             }
             c.innerHTML=`<span style="padding: 4px">${cnt}</span>`;
         }

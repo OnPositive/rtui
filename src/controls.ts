@@ -293,6 +293,13 @@ export class Composite extends AbstractComposite {
     }
     protected disabled:boolean=false;
 
+    rendersLabel(c:IControl){
+        if (this.children.length==1){
+            return this.parent.rendersLabel(c);
+        }
+        return false;
+    }
+
     setDisabled(v: boolean){
         if (this.disabled!=v){
             this.innerSetDisabled(v);
@@ -534,6 +541,7 @@ export class Form extends Composite {
         this._style.padding = "10px";
         this._style.width = "100%"
     }
+
 }
 export class HorizontalFlex extends Composite {
 
@@ -544,6 +552,12 @@ export class HorizontalFlex extends Composite {
     }
 
     wrapStyle: CSSStyleDeclaration = <any>{}
+
+    needChildLabel:boolean=true;
+
+    rendersLabel(c:IControl){
+        return !this.needChildLabel;
+    }
 
     protected wrap(p: HTMLElement,c?: IControl) {
         if (c instanceof Composite){
@@ -966,12 +980,16 @@ export class HorizontalTabFolder extends Composite {
 
     innerRender(e: Element) {
         var f = new Form();
+        f._style.display="flex";
+        f._style.flexDirection="column";
         f._style.overflow="auto"
+        f._style.width="100%"
         //f._style.height = "100%"
         //f._style.overflow="auto"
         var vv = new VerticalFlex();
         //vv.wrapStyle.height = "100%";
         var m = new HorizontalFlex();
+        m.needChildLabel=false;
         m.addClassName("panel")
         m.addClassName("panel-default")
         //vv._style.height = "100%"
