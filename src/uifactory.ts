@@ -7,7 +7,7 @@ import ro=require("./renderingOptions")
 import IPropertyGroup=tps.ts.IPropertyGroup;
 import {RadioSelect, StatusRender} from "./forms";
 import {Binding} from "raml-type-bindings";
-import {Label} from "./controls";
+import {Label, Composite} from "./controls";
 
 declare const marked:any
 
@@ -294,10 +294,10 @@ function referenceControl(b: IBinding) {
     if (ll) {
         cl = ll.collection;
     }
-    else {
-        var cl = new tps.Binding("");
-        cl.value = forms.enumOptions(ct, b);
-        cl._type = b.type();
+    if (!ll){
+        var rs= new Composite("span");
+        rs.addLabel("Can not bind reference")
+        return rs;
     }
     bm._binding = cl;
     tps.bidirectional(b, cl, ll.transformer, ll.btrasform);//

@@ -5,7 +5,7 @@ import uifactory=require("./uifactory")
 import IBinding=tps.IBinding
 import IPropertyGroup=tps.ts.IPropertyGroup;
 import wb=require("./workbench");
-import {IControl, Composite, VerticalFlex} from "./controls";
+import {IControl, Composite, VerticalFlex, HorizontalFlex} from "./controls";
 import {ISelectionProvider, ISelectionListener} from "./workbench";
 import {IValueListener, ChangeEvent, Binding, Status} from "raml-type-bindings";
 import {ListenableAction} from "./actions";
@@ -315,12 +315,84 @@ export abstract class BindableControl extends controls.Composite {
     }
 }
 
+
+export class ApplyRevertComposite extends BindableControl{
+
+    constructor(private d:tps.CachingBinding){
+        super('div');
+        this._binding=d;
+        var h=this;
+        d.dirtyController.addListener({
+            valueChanged(){
+                h.refresh();
+            }
+        })
+
+    }
+    initBinding(){
+
+    }
+
+    renderChildren(c:HTMLElement){
+        var h=new Composite("span")
+        h._style.cssFloat="right";
+        var cmm=new Button("Apply Changes");
+        var dirty=this.d.dirtyController.get();
+        if (!dirty){
+            cmm.addClassName("btn-disabled")
+            cmm.setDisabled(true);
+        }
+        cmm.onClick=(x)=>{this.d.commit()}
+        cmm.addClassName("btn-primary")
+        cmm._style.marginRight="5px";
+        h.add(cmm);
+        var r=new Button("Revert");
+        if (!dirty){
+            r.addClassName("btn-disabled")
+            r.setDisabled(true);
+        }
+        h.add(r);
+        r.onClick=(x)=>{this.d.revert()}
+        h._style.padding="5px"
+        h.render(c);
+    }
+}
 export class BindableComposite extends BindableControl {
 
     hasContent: boolean
 
-    protected initBinding(ch: HTMLElement) {
+    contentCreated:boolean;
 
+    pb:Binding;
+
+    protected initBinding(ch: HTMLElement) {
+        if (!this.contentCreated) {
+            this.contentCreated=true;
+            this.children = [];
+            var footer=null
+            if (!this._binding.autoCommit()) {
+                let cachingBinding = new tps.CachingBinding(<tps.Binding>this._binding);
+                this.pb= cachingBinding;
+                footer=new ApplyRevertComposite(cachingBinding);
+            }
+            else{
+                this.pb=(<tps.Binding>this._binding);
+            }
+            var cntrl = <controls.Composite>uifactory.service.createControl(this.pb, this.getRenderingOptions());
+            this.children.push(cntrl);
+            if (footer){
+                this.children.push(footer);
+            }
+            if (cntrl.canShrinkChildrenVertically()) {
+                cntrl._style.flex = "1 0 auto";
+            }
+        }
+    }
+    onDetach(e:HTMLElement){
+        super.onDetach(e);
+        if (this.pb!=this._binding){
+            (<tps.CachingBinding>this.pb).dispose();
+        }
     }
 
     needsVerticalScroll() {
@@ -345,10 +417,14 @@ export class BindableComposite extends BindableControl {
 
     afterCreate?: (c: BindableControl) => void
 
+
+
     renderChildren(ch: HTMLElement) {
         this.hasContent = this._binding.get() != null && this._binding.get() != undefined;
         if (this.hasContent) {
+
             super.renderChildren(ch)
+
         }
         else {
             //var cm=new Composite("div");
@@ -559,6 +635,12 @@ export class Select extends BindableControl {
             this.initBinding(<HTMLElement>this._element);
         }
     }
+    onAttach(el:HTMLElement){
+        var info = new EnumInfo(this._binding, false,!this.inUpdate)
+        el.onchange = (e) => {
+            this._binding.set(info.labelsMap.get((<HTMLInputElement>el).value));
+        }
+    }
 
     protected initBinding(ch: HTMLElement) {
         var el: HTMLSelectElement = <HTMLSelectElement>ch;
@@ -632,12 +714,13 @@ export class Button extends controls.Composite {
     constructor(text: string) {
         super("button")
         //this.attrs.type="select";
-        this.addClassName("form-control");
+        //this.addClassName("form-control");
         this.addClassName("btn")
         this.addClassName("btn-default")
         this._text = text;
     }
 }
+
 export class Link extends controls.Composite {
     constructor(txt: string = "") {
         super("a");
@@ -689,7 +772,7 @@ export class PagingControl extends BindableControl {
         }
         var total=paged.total();
         var inside=paged.get();
-        if (total!=-1&&inside.length>=total||(paged.isLoading()&&!this.lastTimeHasPaged)) {
+        if (total!=-1&&(inside&&inside.length>=total)||(paged.isLoading()&&!this.lastTimeHasPaged)) {
             this.lastTimeHasPaged=false;
             return;
         }
@@ -828,18 +911,13 @@ export class MasterDetails extends controls.HorizontalFlex {
         cm1._style.display = "flex";
         cm1._style.flexDirection = "column";
         cm1._style.flex = "1 1 0";
-
         cm1._style.marginBottom = "5px";
         cm1._style.borderLeftStyle = "solid"
         cm1._style.borderLeftColor = "#eeeeee"
         //cm1._style.marginLeft="5px";//
         var opt=this.getRenderingOptions();
         let mmdl=opt.maxMasterDetailsLevel?opt.maxMasterDetailsLevel:1;
-        var cntrl = <controls.Composite>uifactory.service.createControl(bnd,ro.clone(opt, {noStatus: true, noStatusDecorations:false,maxMasterDetailsLevel:mmdl-1}));
-        if (cntrl.canShrinkChildrenVertically()) {
-            cntrl._style.flex = "1 0 auto";
-        }
-        cm1.add(cntrl);
+        cm1.setRenderingOptions(ro.clone(opt, {noStatus: true, noStatusDecorations:false,maxMasterDetailsLevel:mmdl-1}));
         return cm1;
     }
 }
@@ -1178,6 +1256,12 @@ export abstract class AbstractListControl extends BindableControl implements ISe
     collection() {
         return this._binding.collectionBinding();
     }
+    protected addIcon(v: any, td: Composite, i: number=0) {
+        var icon = tps.service.icon(v, this._binding.collectionBinding().componentType())
+        if (i == 0 && icon) {
+            td.addHTML(`<img style="margin-right: 4px;max-height: 24px" src="${icon}"></img>`)
+        }
+    }
 
     selectionBinding() {
         return this._binding.collectionBinding().selectionBinding();
@@ -1307,7 +1391,7 @@ export abstract class AbstractListControl extends BindableControl implements ISe
 
     onDetach(e: Element) {
         this._binding.removeListener(this.rff);
-
+        this.contentPrepared=false;
         super.onDetach(e);
     }
 
@@ -1476,6 +1560,7 @@ export class SimpleListControl extends AbstractListControl {
         if (this.isSelected(v)) {
             rs.addClassName("active");
         }
+        this.addIcon(v,rs);
         var label = this.addInstanceLabel(v, rs, this._binding.collectionBinding().componentType());
         if (this.hasError(position)) {
             rs.addHTML(ERROR);
@@ -1795,9 +1880,7 @@ export class TableControl extends AbstractListControl {
             td._style.display = "inline"
             td._style.flex = this.calcFlex(p);
             td.addClassName("col")
-            if (i == 0 && (<tps.metakeys.Icon>this._binding.collectionBinding().componentType()).icon) {
-                td.addHTML(`<img style="margin-right: 4px" src="${(<tps.metakeys.Icon>this._binding.collectionBinding().componentType()).icon}"></img>`)
-            }
+            this.addIcon(v, td, i);
             this.addInstanceLabel(tps.service.getValue(p.type, v, p.id), td, p.type)
 
             if (i == 0) {
@@ -1813,6 +1896,8 @@ export class TableControl extends AbstractListControl {
         }
         return rs;
     }
+
+
 }
 
 export class CheckBox extends BindableControl {
