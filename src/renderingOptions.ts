@@ -8,7 +8,7 @@ export interface RenderingOptions{
     dialog?: boolean
     noStatus?:boolean
     noStatusDecorations?:boolean
-
+    noMargin?: boolean
     kind?: string
 }
 

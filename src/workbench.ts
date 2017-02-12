@@ -40,10 +40,15 @@ export class LayoutPart implements ILayoutPart {
         var fid = nextId();
         var nid = nextId();
         var ss="height: 100%";
+        var ss1=(!grabHorizonatal)?"height:100%":""
         if (grabHorizonatal){
-            ss="width: 100%";
+            ss="width: 100%; display:flex";
         }
-        var content = `<div style="${ss}"><div  id="${fid}" class="split split-horizontal" style="height: 100%"></div><div id="${nid}" class="split split-horizontal" style="height: 100%"></div></div>`;
+        var content = `<div style="${ss}"><div  id="${fid}" class="split split-horizontal" style="${ss1}"></div>
+            <div id="${nid}" class="split split-horizontal" style="${ss1}"></div></div>`;
+        if(grabHorizonatal){
+            this._el.classList.add("grabHorizontal")
+        }
         this._el.innerHTML = content;
         var r1 = new LayoutPart(document.getElementById(fid));
         var r2 = new LayoutPart(document.getElementById(nid));

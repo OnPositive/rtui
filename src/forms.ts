@@ -67,7 +67,7 @@ export class TabFolder extends controls.WrapComposite implements controls.HasChi
     constructor() {
         super("div")
         if (this.grabVertical) {
-            this._style.flex = "1 1 auto";
+
             this._style.display = "flex";
             this._style.flexDirection = "column"
         }
@@ -119,6 +119,9 @@ export class TabFolder extends controls.WrapComposite implements controls.HasChi
 
 
     protected extraRender(ch: HTMLElement) {
+        if (this.grabVertical) {
+            ch.style.flex = this.getRenderingOptions().dialog ? "1 1 auto" : "1 1 0";
+        }
         var rs: string[] = [];
         var ll = document.createElement("ul");
         ll.classList.add("nav")
@@ -167,7 +170,7 @@ export class TabFolder extends controls.WrapComposite implements controls.HasChi
         cc.classList.add("tab-content")
         cc.classList.add("clearfix")
         if (this.grabVertical) {
-            cc.style.flex = "1 1 auto";
+            cc.style.flex = this.getRenderingOptions().dialog?"1 1 auto":"1 1 0";
             cc.style.display = "flex";
             cc.style.flexDirection = "column"
         }
@@ -384,7 +387,7 @@ export class BindableComposite extends BindableControl {
                 this.children.push(footer);
             }
             if (cntrl.canShrinkChildrenVertically()) {
-                cntrl._style.flex = "1 0 auto";
+                cntrl._style.flex = "1 0 0";
             }
         }
     }
@@ -640,6 +643,7 @@ export class Select extends BindableControl {
         el.onchange = (e) => {
             this._binding.set(info.labelsMap.get((<HTMLInputElement>el).value));
         }
+        super.onAttach(el);
     }
 
     protected initBinding(ch: HTMLElement) {
@@ -887,6 +891,7 @@ export class MasterDetails extends controls.HorizontalFlex {
             delete this._style.flexDirection;
             this._style.width = "100%";
             this._style.flex = "1 1 0";
+            this._style.display="flex"
             return;
         }
 
@@ -1656,7 +1661,6 @@ export class ButtonMultiSelectControl extends AbstractListControl {
     }
 }
 declare var require: any
-var ft: any = require("fixed-header-table");
 
 var h: any = require("javascript-detect-element-resize")
 declare function addResizeListener(e: Element, v: () => void);

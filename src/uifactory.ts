@@ -121,8 +121,11 @@ const StringControlFactory: IControlFactory = {
                 w._binding = b;
                 var vm=new controls.Composite("div");
                 var s = new forms.Section(b.type().displayName,true)
-                //s._style.margin = "5px";
-                s.body._style.padding = "0px";
+                if (!rc.noMargin) {
+                    s._style.margin = "5px";
+                }
+                    s.body._style.padding = "0px";
+
 
                 s.add(w);
 
@@ -198,10 +201,14 @@ const ArrayControlFactory: IControlFactory = {
         var props=tps.service.visibleProperties(b.collectionBinding().componentType());
 
         if (props.length>1){
-            var tb=new forms.TableControl();
-            tb._binding=b;
-            //this is ids;
-            lst=tb;
+            var repre=<any>b.type();
+            if (repre.representation!="list") {
+                var tb = new forms.TableControl();
+
+                tb._binding = b;
+                //this is ids;
+                lst = tb;
+            }
         }
         lst._binding = b;
         var items=[];
@@ -356,7 +363,7 @@ export class DisplayManager {
                 var tf = groups.length<=4?new forms.TabFolder():new controls.HorizontalTabFolder("div");
                 tf._style.padding="5px";
                 for (var i = 1; i < groups.length; i++) {
-                    var cm=ro.clone(r,{noStatus:true,noStatusDecorations:true})
+                    var cm=ro.clone(r,{noStatus:true,noStatusDecorations:true,noMargin: true})
                     var ss: controls.IControl = this.renderGroup(b, groups[i],cm,false);
                     if (ss instanceof controls.VerticalFlex) {
                         if (ss.children.length == 1) {
