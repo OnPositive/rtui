@@ -175,34 +175,44 @@ const ArrayControlFactory: IControlFactory = {
             }
         }
         if (tps.service.isMultiSelect(b.type())){
+            if (!b.accessControl().canEditSelf()){
+                var bm = new forms.ButtonMultiSelectControl();
+                bm._binding=b;
+
+                //tps.unidirectional(b,bl);
+                return bm;
+            }
             var bm=new forms.ButtonMultiSelectControl();
             var ct=tps.service.componentType(b.type());
 
             var ll=tps.enumOptionsBinding(b.type(),b);
-            var cl:Binding;
-            if (ll){
-                cl=ll.collection;
+            if (ll) {
+                var cl: Binding;
+                if (ll) {
+                    cl = ll.collection;
+                }
+                else {
+                    var cl = new tps.Binding("");
+                    cl.value = forms.enumOptions(ct, b);
+                    cl._type = b.type();
+                }
+                bm._binding = cl;
+                tps.bidirectional(b, cl, ll.transformer, ll.btrasform);//
+                var cmm = new controls.Composite("span")
+                cmm.setTitle(tps.service.caption(b.type()));
+                bm.setTitle(tps.service.caption(b.type()));
+                cmm.add(bm)
+                return cmm;
             }
-            else {
-                var cl = new tps.Binding("");
-                cl.value = forms.enumOptions(ct, b);
-                cl._type = b.type();
-            }
-            bm._binding=cl;
-            tps.bidirectional(b,cl,ll.transformer,ll.btrasform);//
-            var cmm=new controls.Composite("span")
-            cmm.setTitle(tps.service.caption(b.type()));
-            bm.setTitle(tps.service.caption(b.type()));
-            cmm.add(bm)
-            return cmm;
         }
         r.setDescription(b.type().description)
         var lst:forms.AbstractListControl = new forms.SimpleListControl();
         var props=tps.service.visibleProperties(b.collectionBinding().componentType());
-
+        var repre=<any>b.type();
+        var representation=repre.representation;
         if (props.length>1){
             var repre=<any>b.type();
-            if (repre.representation!="list") {
+            if (representation!="list"&&representation!="list-only") {
                 var tb = new forms.TableControl();
 
                 tb._binding = b;
@@ -231,7 +241,8 @@ const ArrayControlFactory: IControlFactory = {
         dr.items=items;
         dr.addTo(lst);
         let v=(v:boolean)=>{r.setVisible(v)};
-        if (props.length>1&&(rc.maxMasterDetailsLevel>0)){
+        if (representation!="list-only"&&representation!="table-only"&&props.length>1&&(rc.maxMasterDetailsLevel>0)){
+
             var md=new forms.MasterDetails(lst);
             r.body._style.padding="0px";//
             r.body._style.paddingRight="3px";//
@@ -293,6 +304,15 @@ tps.declareMeta(tps.TYPE_BOOLEAN,<tps.metakeys.Label>{
     htmlLabel: true
 })
 function referenceControl(b: IBinding) {
+    if (!b.accessControl().canEditSelf()){
+        var bm = new forms.ButtonMultiSelectControl();
+        var bl=new Binding("val");
+        bl._type=tps.array(b.type());
+        bl._type.displayName=tps.service.caption(b.type());
+        bm._binding=bl;
+        tps.unidirectional(b,bl);
+        return bm;
+    }
     var bm = new forms.ButtonMultiSelectControl();
     var ct = tps.service.componentType(b.type());
     bm.setSingle(true)

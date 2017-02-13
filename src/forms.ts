@@ -557,7 +557,14 @@ export class EnumInfo {
     constructor(private b: IBinding, radio:boolean=false,doSet = true) {
         var enumv: any[] = enumValues(b);
         var vl = b.get();
-        const hasDescriptions: tps.metakeys.EnumDescriptions = <any>b.type();
+
+        let type = b.type();
+        const hasDescriptions: tps.metakeys.EnumDescriptions = <any>type;
+        if (type.default){
+            if (!vl){
+                vl=type.default;
+            }
+        }
         for (var i = 0; i < enumv.length; i++) {
             var lab = enumv[i];
             var val = lab;
@@ -566,7 +573,7 @@ export class EnumInfo {
             }
             else {
                 if (typeof lab != "string") {
-                    val = tps.service.label(lab, b.type());
+                    val = tps.service.label(lab, type);
                 }
             }
             if (val === b.get()) {
@@ -575,18 +582,20 @@ export class EnumInfo {
             this.labelsMap.set(val, lab);
             this.labels.push(val);
         }
-        if ((!b.type().required)||((enumv.indexOf(vl) == -1)&&!radio)) {
-            this.labels=[''].concat(this.labels);
-            enumv=[''].concat(this.labels);
-            this.labelsMap.set('', '');
-            if (!vl || this.labels.indexOf(vl) == -1) {
-                vl = "";
-                if (doSet&&b.get()) {
-                    b.set("");
+        if ((!type.required)||((enumv.indexOf(vl) == -1)&&!radio)) {
+            if (!type.default) {
+                this.labels = [''].concat(this.labels);
+                enumv = [''].concat(this.labels);
+                this.labelsMap.set('', '');
+                if (!vl || this.labels.indexOf(vl) == -1) {
+                    vl = "";
+                    if (doSet && b.get()) {
+                        b.set("");
+                    }
                 }
-            }
-            if ((!b.type().required)){
-                this.selectedIndex++;
+                if ((!type.required)) {
+                    this.selectedIndex++;
+                }
             }
         }
         else {
@@ -1519,9 +1528,7 @@ export abstract class AbstractListControl extends BindableControl implements ISe
         this.contentPrepared = true;
         if (ac.length == 0) {
             this.children = []
-            var comp = new controls.Composite("div");
-            comp._style.padding = "10px";
-            comp.addLabel("Nothing here yet");
+            var comp = this.createNothingContent();
             this.add(comp)
         }
         else if (this.needPaging()) {
@@ -1529,6 +1536,13 @@ export abstract class AbstractListControl extends BindableControl implements ISe
             this.add(this.footer);
         }
         this.refresh();
+    }
+
+    protected createNothingContent() {
+        var comp = new controls.Composite("div");
+        comp._style.padding = "10px";
+        comp.addLabel("Nothing here yet");
+        return comp;
     }
 
     needPaging() {
@@ -1581,6 +1595,10 @@ export class SimpleListControl extends AbstractListControl {
 }
 export class ButtonMultiSelectControl extends AbstractListControl {
 
+    protected createNothingContent() {
+        var comp = new controls.Composite("div");
+        return comp;
+    }
 
     constructor() {
         super("div")
@@ -1713,6 +1731,9 @@ export class TableControl extends AbstractListControl {
         var ps = this.columnProps();
         var mmm: {[name: string]: number} = {};
         ps.forEach(x => {
+            if (!x){
+                return
+            }
             var val = mmm[x.id];
             if (!val) {
                 val = 0;
@@ -1836,7 +1857,11 @@ export class TableControl extends AbstractListControl {
         if (columns) {
             ps=[]
             columns.forEach(x=>{
-                ps.push(tps.service.property(this._binding.collectionBinding().componentType(),x));
+                var pr=tps.service.property(this._binding.collectionBinding().componentType(),x);
+                if (!pr){
+                    return;
+                }
+                ps.push(pr);
             })
         }
         else {
