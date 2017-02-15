@@ -9,9 +9,9 @@ import {RadioSelect, StatusRender} from "./forms";
 import {Binding} from "raml-type-bindings";
 import {Label, Composite} from "./controls";
 
-declare const marked:any
+declare const marked: any
 
-export interface RenderingContext extends ro.RenderingOptions{
+export interface RenderingContext extends ro.RenderingOptions {
 
 
 }
@@ -41,50 +41,50 @@ const BooleanControlFactory: IControlFactory = {
 const UnionControlFactory: IControlFactory = {
 
     createControl(b: IBinding, r?: RenderingContext){
-        var u:tps.UnionType=<any>b.type();
-        var allScalar=true;
-        var allObject=true;
-        var allArray=true;
-        var allMap=true;
-        u.options.forEach(x=>{
-            allScalar=x&&tps.service.isScalar(tps.service.resolvedType(x));
+        var u: tps.UnionType = <any>b.type();
+        var allScalar = true;
+        var allObject = true;
+        var allArray = true;
+        var allMap = true;
+        u.options.forEach(x => {
+            allScalar = x && tps.service.isScalar(tps.service.resolvedType(x));
         });
-        if (allScalar){
+        if (allScalar) {
             return StringControlFactory.createControl(b);
         }
         var s = new controls.Composite("span");
-        s.addLabel("Can not represent type: "+u.displayName);
+        s.addLabel("Can not represent type: " + u.displayName);
         return s;
     }
 }
 tps.declareMeta(tps.TYPE_UNION, UnionControlFactory);
 tps.declareMeta(tps.TYPE_BOOLEAN, BooleanControlFactory);
-declare var $:any
+declare var $: any
 const StringControlFactory: IControlFactory = {
     createControl(b: IBinding, rc?: RenderingContext){
-        if ((<tps.metakeys.Reference>b.type()).reference){
+        if ((<tps.metakeys.Reference>b.type()).reference) {
             return referenceControl(b);
         }
-        if (!b.accessControl().canEditSelf()){
-            var bl=new forms.BindedLabel("div");
-            bl._binding=b;
+        if (!b.accessControl().canEditSelf()) {
+            var bl = new forms.BindedLabel("div");
+            bl._binding = b;
             return bl;
         }
         var r = new forms.InputGroup();
         var nAddon = new forms.InputGroupAddOn();
-        if (rc.kind!="filter") {
+        if (rc.kind != "filter") {
             r._style.width = "100%";
         }
-        else{
+        else {
             r._style.maxWidth = "300px";
-            r._style.padding="0px"
-            r._style.marginRight="3px"//
+            r._style.padding = "0px"
+            r._style.marginRight = "3px"//
         }
         r.add(nAddon)
 
         nAddon._style.textAlign = "left"
         var ll = new controls.Composite("span");
-        var gtitle=b.type().displayName + (b.type().required ? "* " : " ");
+        var gtitle = b.type().displayName + (b.type().required ? "* " : " ");
         ll.addLabel(gtitle);
         if (b.type().description) {
             ll.add(new forms.Help(b.type().description))
@@ -93,8 +93,8 @@ const StringControlFactory: IControlFactory = {
         nAddon.add(ll);
         var mm: tps.FullTypeOptions = <any>b.type();
         if ((mm.enum || mm.enumValues)) {
-            if(mm.enum){
-                if (mm.enum.length<6&&rc.kind!="filter") {
+            if (mm.enum) {
+                if (mm.enum.length < 6 && rc.kind != "filter") {
                     var res = new RadioSelect()
                     res._binding = b;
                     return res;
@@ -116,26 +116,30 @@ const StringControlFactory: IControlFactory = {
                     return w;
                 }
                 w._style.borderWidth = "0px";
-                w._style.height="100%"
-                w._style.flex="1 1 auto"
+                w._style.height = "100%"
+                w._style.flex = "1 1 auto"
                 w._binding = b;
-                var vm=new controls.Composite("div");
-                var s = new forms.Section(b.type().displayName,true)
+                var vm = new controls.Composite("div");
+                var s = new forms.Section(b.type().displayName, true)
                 if (!rc.noMargin) {
                     s._style.margin = "5px";
                 }
-                    s.body._style.padding = "0px";
+                s.body._style.padding = "0px";
 
 
                 s.add(w);
 
                 return s;
             }
-            var te=(<tps.metakeys.TypeAhead>b.type()).typeahead;
-            if (te){
-                w.afterCreate=(c)=>{
-                    var w:any=window;
-                    $("#"+c.id()).typeahead({ source:function(name:string,c:(v:string[])=>void){c(tps.calcExpression(te,b))}});
+            var te = (<tps.metakeys.TypeAhead>b.type()).typeahead;
+            if (te) {
+                w.afterCreate = (c) => {
+                    var w: any = window;
+                    $("#" + c.id()).typeahead({
+                        source: function (name: string, c: (v: string[]) => void) {
+                            c(tps.calcExpression(te, b))
+                        }
+                    });
                 }
             }
 
@@ -148,11 +152,12 @@ const StringControlFactory: IControlFactory = {
 
 const ArrayControlFactory: IControlFactory = {
     createControl(b: IBinding, rc?: RenderingContext){
-        var r = new forms.Section(b.type().displayName,true);
+        var r = new forms.Section(b.type().displayName, true);
 
-        var params=(<tps.Operation>b.type()).parameters;
-        if (b instanceof  tps.ViewBinding) {
-            var ps=b.parameterBindings();
+        var params = (<tps.Operation>b.type()).parameters;
+        var menuOnlyItems=[]
+        if (b instanceof tps.ViewBinding) {
+            var ps = b.parameterBindings();
             if (ps.length > 0) {
 
                 var hs = new controls.HorizontalFlex();
@@ -162,30 +167,35 @@ const ArrayControlFactory: IControlFactory = {
                     if (b.lookupVar(x.id())) {
                         x.set(b.lookupVar(x.id()));
                     }
-                    else{
+                    else {
                         hs.add(service.createControl(x, c));
+                        if (tps.service.isFiniteSetOfInstances(x.type())){
+                            menuOnlyItems.push(new actions.ValuesMenu(x));
+                        }
                     }
+
                 })
-                if (hs.children.length>0) {
+                if (hs.children.length > 0) {
                     r.heading._style.padding = "5px"
                     hs._style.cssFloat = "right"
                     r.heading.add(hs);//
                 }
                 r.toolbar._style.marginTop = "3px";//
+
             }
         }
-        if (tps.service.isMultiSelect(b.type())){
-            if (!b.accessControl().canEditSelf()){
+        if (tps.service.isMultiSelect(b.type())) {
+            if (!b.accessControl().canEditSelf()) {
                 var bm = new forms.ButtonMultiSelectControl();
-                bm._binding=b;
+                bm._binding = b;
 
                 //tps.unidirectional(b,bl);
                 return bm;
             }
-            var bm=new forms.ButtonMultiSelectControl();
-            var ct=tps.service.componentType(b.type());
+            var bm = new forms.ButtonMultiSelectControl();
+            var ct = tps.service.componentType(b.type());
 
-            var ll=tps.enumOptionsBinding(b.type(),b);
+            var ll = tps.enumOptionsBinding(b.type(), b);
             if (ll) {
                 var cl: Binding;
                 if (ll) {
@@ -206,13 +216,13 @@ const ArrayControlFactory: IControlFactory = {
             }
         }
         r.setDescription(b.type().description)
-        var lst:forms.AbstractListControl = new forms.SimpleListControl();
-        var props=tps.service.visibleProperties(b.collectionBinding().componentType());
-        var repre=<any>b.type();
-        var representation=repre.representation;
-        if (props.length>1){
-            var repre=<any>b.type();
-            if (representation!="list"&&representation!="list-only") {
+        var lst: forms.AbstractListControl = new forms.SimpleListControl();
+        var props = tps.service.visibleProperties(b.collectionBinding().componentType());
+        var repre = <any>b.type();
+        var representation = repre.representation;
+        if (props.length > 1) {
+            var repre = <any>b.type();
+            if (representation != "list" && representation != "list-only") {
                 var tb = new forms.TableControl();
 
                 tb._binding = b;
@@ -221,37 +231,39 @@ const ArrayControlFactory: IControlFactory = {
             }
         }
         lst._binding = b;
-        var items=[];
-        if (b.accessControl().supportsAdd()){
-            if (b.addOperation()){
-                items.push(new actions.CreateWithConstructorAction(b,b.addOperation()));
+        var items = [];
+        if (b.accessControl().supportsAdd()) {
+            if (b.addOperation()) {
+                items.push(new actions.CreateWithConstructorAction(b, b.addOperation()));
             }
             else {
                 items.push(new actions.CreateAction(b));
             }
         }
-        if (b.accessControl().supportsUpdate()){
+        if (b.accessControl().supportsUpdate()) {
             items.push(new actions.EditAction(b));
         }
-        if (b.accessControl().supportsRemove()){
+        if (b.accessControl().supportsRemove()) {
             items.push(new actions.DeleteAction(b));
         }
-        r.toolbar.items =items;
-        var dr=new forms.DropDown();
-        dr.items=items;
+        r.toolbar.items = items;
+        var dr = new forms.DropDown();
+        dr.items = items.concat(menuOnlyItems);
         dr.addTo(lst);
-        let v=(v:boolean)=>{r.setVisible(v)};
-        if (representation!="list-only"&&representation!="table-only"&&props.length>1&&(rc.maxMasterDetailsLevel>0)){
+        let v = (v: boolean) => {
+            r.setVisible(v)
+        };
+        if (representation != "list-only" && representation != "table-only" && props.length > 1 && (rc.maxMasterDetailsLevel > 0)) {
 
-            var md=new forms.MasterDetails(lst);
-            r.body._style.padding="0px";//
-            r.body._style.paddingRight="3px";//
+            var md = new forms.MasterDetails(lst);
+            r.body._style.padding = "0px";//
+            r.body._style.paddingRight = "3px";//
             r.add(md)
-            md.onVisibilityChanged=v;
+            md.onVisibilityChanged = v;
         }
         else {
             r.add(lst);
-            lst.onVisibilityChanged=v;
+            lst.onVisibilityChanged = v;
         }
 
         return r;
@@ -273,15 +285,15 @@ var entityMap = {
     '=': '&#x3D;'
 };
 
-function escapeHtml (string) {
+function escapeHtml(string) {
     return String(string).replace(/[&<>"'`=\/]/g, function (s) {
         return entityMap[s];
     });
 }
-tps.declareMeta(tps.TYPE_MARKDOWN,<tps.metakeys.Label>{
+tps.declareMeta(tps.TYPE_MARKDOWN, <tps.metakeys.Label>{
 
     label(v: string){
-        if (!v){
+        if (!v) {
             return "";
         }
         return marked(v);
@@ -289,7 +301,7 @@ tps.declareMeta(tps.TYPE_MARKDOWN,<tps.metakeys.Label>{
 
     htmlLabel: true
 })
-tps.declareMeta(tps.TYPE_BOOLEAN,<tps.metakeys.Label>{
+tps.declareMeta(tps.TYPE_BOOLEAN, <tps.metakeys.Label>{
 
     cellSize: 1,
 
@@ -304,13 +316,13 @@ tps.declareMeta(tps.TYPE_BOOLEAN,<tps.metakeys.Label>{
     htmlLabel: true
 })
 function referenceControl(b: IBinding) {
-    if (!b.accessControl().canEditSelf()){
+    if (!b.accessControl().canEditSelf()) {
         var bm = new forms.ButtonMultiSelectControl();
-        var bl=new Binding("val");
-        bl._type=tps.array(b.type());
-        bl._type.displayName=tps.service.caption(b.type());
-        bm._binding=bl;
-        tps.unidirectional(b,bl);
+        var bl = new Binding("val");
+        bl._type = tps.array(b.type());
+        bl._type.displayName = tps.service.caption(b.type());
+        bm._binding = bl;
+        tps.unidirectional(b, bl);
         return bm;
     }
     var bm = new forms.ButtonMultiSelectControl();
@@ -321,8 +333,8 @@ function referenceControl(b: IBinding) {
     if (ll) {
         cl = ll.collection;
     }
-    if (!ll){
-        var rs= new Composite("span");
+    if (!ll) {
+        var rs = new Composite("span");
         rs.addLabel("Can not bind reference")
         return rs;
     }
@@ -336,14 +348,14 @@ function referenceControl(b: IBinding) {
 }
 export class DisplayManager {
 
-    createOperationControl(op:tps.Operation,r?:RenderingContext):controls.IControl{
+    createOperationControl(op: tps.Operation, r?: RenderingContext): controls.IControl {
         return new controls.Label(op.displayName);
     }
 
     createControl(b: IBinding, r?: RenderingContext): controls.IControl {
         r = this.copyContext(r);
         var c = <IControlFactory><any>b.type();
-        if (!b.get()&&b.get()!==false) {
+        if (!b.get() && b.get() !== false) {
             var dv = b.type().default
             if (dv) {
                 b.set(dv);
@@ -363,7 +375,7 @@ export class DisplayManager {
             }
             return tp;
         }
-        if ((<tps.metakeys.Reference>b.type()).reference){
+        if ((<tps.metakeys.Reference>b.type()).reference) {
             return referenceControl(b);
         }
         var groups = tps.service.propertyGroups(b.type());
@@ -371,23 +383,23 @@ export class DisplayManager {
             return new controls.Label(tps.service.label(b.get(), b.type()));
         }
         if (groups.length == 1) {
-            var group= this.renderGroup(b, groups[0], r, r.noStatus?false:true);
+            var group = this.renderGroup(b, groups[0], r, r.noStatus ? false : true);
             group.setTitle(b.type().displayName);
             group.setRenderingOptions(r);
             return group;
         }
         else {
-            if (groups[0].properties.length < 6||true) {
-                var rs: controls.Composite = <controls.Composite>this.renderGroup(b, groups[0], r, true&&(!r.noStatus));
+            if (groups[0].properties.length < 6 || true) {
+                var rs: controls.Composite = <controls.Composite>this.renderGroup(b, groups[0], r, true && (!r.noStatus));
                 rs.setRenderingOptions(r);
-                var tf = groups.length<=4?new forms.TabFolder():new controls.HorizontalTabFolder("div");
-                tf._style.padding="5px";
+                var tf = groups.length <= 4 ? new forms.TabFolder() : new controls.HorizontalTabFolder("div");
+                tf._style.padding = "5px";
                 for (var i = 1; i < groups.length; i++) {
-                    var cm=ro.clone(r,{noStatus:true,noStatusDecorations:true,noMargin: true})
-                    var ss: controls.IControl = this.renderGroup(b, groups[i],cm,false);
+                    var cm = ro.clone(r, {noStatus: true, noStatusDecorations: true, noMargin: true})
+                    var ss: controls.IControl = this.renderGroup(b, groups[i], cm, false);
                     if (ss instanceof controls.VerticalFlex) {
                         if (ss.children.length == 1) {
-                            var  vv=ss.children[0];
+                            var vv = ss.children[0];
 
                             ss = vv;
                         }
@@ -406,10 +418,10 @@ export class DisplayManager {
     }
 
     private copyContext(r: RenderingContext) {
-        var dfo=ro.defaultOptions();
-        Object.keys(dfo).forEach(x=>{
-            if (r[x]==undefined){
-                r[x]=dfo[x];
+        var dfo = ro.defaultOptions();
+        Object.keys(dfo).forEach(x => {
+            if (r[x] == undefined) {
+                r[x] = dfo[x];
             }
         })
         if (r) {
@@ -423,24 +435,24 @@ export class DisplayManager {
         return r;
     }
 
-    renderGroup(b: IBinding, g: tps.ts.IPropertyGroup, r?: RenderingContext, needStatus: boolean = false):controls.AbstractComposite {
+    renderGroup(b: IBinding, g: tps.ts.IPropertyGroup, r?: RenderingContext, needStatus: boolean = false): controls.AbstractComposite {
         var result = new controls.VerticalFlex();
-        result._style.flex="1 1 auto";
+        result._style.flex = "1 1 auto";
         result.setTitle(g.caption);
-        if (!r){
-            r={
-                noStatus:!needStatus,
-                noStatusDecorations:true
+        if (!r) {
+            r = {
+                noStatus: !needStatus,
+                noStatusDecorations: true
             }
         }
 
-        if (needStatus||(!r.noStatusDecorations)) {
+        if (needStatus || (!r.noStatusDecorations)) {
             let rnd = new forms.StatusRender();
-            if (!needStatus){
-                rnd.displayMessage=false;
+            if (!needStatus) {
+                rnd.displayMessage = false;
             }
-            if (r.noStatusDecorations){
-                rnd.displayDecorations=false;
+            if (r.noStatusDecorations) {
+                rnd.displayDecorations = false;
             }
             rnd._binding = b;
             result.add(rnd)
@@ -452,13 +464,13 @@ export class DisplayManager {
         g.properties.forEach(x => {
             var o = this.copyContext(r);
             o.dialog = false;
-            o.noStatus=true;
+            o.noStatus = true;
             result.add(this.createControl(b.binding(x.id), o));
         });
-        if (result.children.length==2){
-            if (result.children[1] instanceof forms.Section&&result.children[0] instanceof StatusRender){
+        if (result.children.length == 2) {
+            if (result.children[1] instanceof forms.Section && result.children[0] instanceof StatusRender) {
 
-                var rr=<forms.Section>result.children[1];
+                var rr = <forms.Section>result.children[1];
                 rr.add(result.children[0]);
                 return rr;
             }

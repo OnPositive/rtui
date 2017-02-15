@@ -178,6 +178,9 @@ export abstract class AbstractComposite implements IControl {
     rendersLabel(c:IControl){
         return false;
     }
+    element(){
+        return this._element;
+    }
 
     setDisabled(v:boolean){
         return;
@@ -974,7 +977,7 @@ export class HorizontalTabFolder extends Composite {
     setChildValidness(validness:boolean[]){
         this.validness=validness;
          if (this.list){
-             this.list.dataRefresh();
+             this.list.dataRefresh(null);
          }
     }
 
@@ -1004,6 +1007,7 @@ export class HorizontalTabFolder extends Composite {
         if (true) {
             var view=this;
             var t = new forms.SimpleListControl();
+            t._style.flex="0 0 auto";
             this.list=t;
             if (this.parent) {
                 t.addControlCustomizer({

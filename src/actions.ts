@@ -4,7 +4,7 @@ import {IContributionItem, IListanableItem} from "./controls";
 import {IBinding, Binding, IValueListener, ChangeEvent, Status} from "raml-type-bindings";
 import wb=require("./workbench")
 import uf=require("./uifactory")
-
+import ctrls=require("./controls")
 export abstract class ListenableAction implements IListanableItem{
 
     private listeners:IValueListener[]=[];
@@ -149,7 +149,29 @@ export class CreateWithConstructorAction extends CollectionAction{
         });
     }
 }
+export class SetBindingValueAction implements IContributionItem{
 
+    title: string
+
+    constructor(private b:Binding,private val: any){
+        this.title=tp.service.label(val,b.type());
+    }
+
+    run(){
+        this.b.set(this.val);
+    }
+}
+export class ValuesMenu implements IContributionItem{
+
+    title: string
+    items:IContributionItem[];
+
+    constructor(private b:Binding){
+        this.title=tp.service.caption(b.type());
+        var en=tp.enumOptions(b.type(),b);
+        this.items=en.map(x=>new SetBindingValueAction(b,x));
+    }
+}
 export class EditAction extends CollectionAction{
 
 
