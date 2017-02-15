@@ -121,7 +121,7 @@ export class CreateWithConstructorAction extends CollectionAction{
     title: string
 
 
-    constructor(protected _valBinding:IBinding,private constructor:tp.Operation){
+    constructor(protected _valBinding:IBinding,private _constructor:tp.Operation){
         super(_valBinding)
     }
 
@@ -132,7 +132,7 @@ export class CreateWithConstructorAction extends CollectionAction{
         return true;
     }
     run(){
-        var nn=new tp.OperationBinding(this.constructor,<tp.Binding>this._valBinding);
+        var nn=new tp.OperationBinding(this._constructor,<tp.Binding>this._valBinding);
         var v=this;
         dialog(tp.service.caption(nn.type()),nn,()=>{
             nn.execute(
