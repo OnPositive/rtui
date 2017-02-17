@@ -295,14 +295,24 @@ export class Composite extends AbstractComposite {
         super()
     }
     protected disabled:boolean=false;
-
+     _rendersLabel:boolean
     rendersLabel(c:IControl){
-        if (this.children.length==1){
+        if (this._rendersLabel){
+            return true;
+        }
+        if (this.children.length==1&&this.parent){
             return this.parent.rendersLabel(c);
         }
         return false;
     }
-
+    needLabel() {
+        if (this.parent) {
+            if (this.parent.rendersLabel(this)) {
+                return false;
+            }
+        }
+        return true;
+    }
     setDisabled(v: boolean){
         if (this.disabled!=v){
             this.innerSetDisabled(v);

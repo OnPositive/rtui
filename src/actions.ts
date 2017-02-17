@@ -149,27 +149,59 @@ export class CreateWithConstructorAction extends CollectionAction{
         });
     }
 }
-export class SetBindingValueAction implements IContributionItem{
+export class SetBindingValueAction implements IContributionItem,tp.IValueListener{
 
     title: string
+    checked: boolean
 
-    constructor(private b:Binding,private val: any){
+    constructor(private b:Binding,private val: any,label?:string){
         this.title=tp.service.label(val,b.type());
+        if (label){
+            this.title=label;
+        }
+        this.valueChanged(null);
+        b.addPrecomitListener(this);
+    }
+
+    valueChanged(e){
+        this.checked=this.b.get()==this.val||(!this.b.get()&&this.val==this.b.type().default);
     }
 
     run(){
+
         this.b.set(this.val);
+        this.valueChanged(null)
     }
 }
 export class ValuesMenu implements IContributionItem{
 
     title: string
     items:IContributionItem[];
-
+    bnd: Binding
+    transform:(x:any)=>any
     constructor(private b:Binding){
         this.title=tp.service.caption(b.type());
         var en=tp.enumOptions(b.type(),b);
-        this.items=en.map(x=>new SetBindingValueAction(b,x));
+        if (!en||en.length==0){
+            var bnd=tp.enumOptionsBinding(b.type(),b);
+            if (bnd) {
+                this.bnd=bnd.collection;
+                bnd.collection.addListener(this)
+                this.valueChanged(null);
+                this.transform=bnd.transformer
+            }
+        }
+        else {
+            this.items = en.map(x => new SetBindingValueAction(b, x));
+        }
+    }
+    valueChanged(e){
+        if (this.bnd) {
+            this.items = this.bnd.collectionBinding().workingCopy().map(x => new SetBindingValueAction(this.b, this.transform?this.transform(x):x,tp.service.label(x,this.bnd.collectionBinding().componentType())));
+            if (!this.bnd.type().required){
+                this.items.push(new SetBindingValueAction(this.b,null,"None"))//
+            }
+        }
     }
 }
 export class EditAction extends CollectionAction{

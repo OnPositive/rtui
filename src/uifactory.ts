@@ -1,6 +1,7 @@
 import controls=require("./controls");
 import tps=require("raml-type-bindings")
 import forms=require("./forms")
+import controlPanel=require("./controlPanel")
 import actions=require("./actions")
 import IBinding=tps.IBinding
 import ro=require("./renderingOptions")
@@ -76,7 +77,7 @@ const StringControlFactory: IControlFactory = {
             r._style.width = "100%";
         }
         else {
-            r._style.maxWidth = "300px";
+            //r._style.maxWidth = "300px";
             r._style.padding = "0px"
             r._style.marginRight = "3px"//
         }
@@ -125,27 +126,16 @@ const StringControlFactory: IControlFactory = {
                     s._style.margin = "5px";
                 }
                 s.body._style.padding = "0px";
-
-
                 s.add(w);
 
                 return s;
             }
-            var te = (<tps.metakeys.TypeAhead>b.type()).typeahead;
-            if (te) {
-                w.afterCreate = (c) => {
-                    var w: any = window;
-                    $("#" + c.id()).typeahead({
-                        source: function (name: string, c: (v: string[]) => void) {
-                            c(tps.calcExpression(te, b))
-                        }
-                    });
-                }
-            }
+
 
             w._binding = b;
             r.add(w);
         }
+
         return r;
     }
 }
@@ -159,29 +149,13 @@ const ArrayControlFactory: IControlFactory = {
         if (b instanceof tps.ViewBinding) {
             var ps = b.parameterBindings();
             if (ps.length > 0) {
-
-                var hs = new controls.HorizontalFlex();
-                hs._style.display = "inline-flex"
-                var c = ro.clone(rc, {kind: "filter"});
-                ps.forEach(x => {
-                    if (b.lookupVar(x.id())) {
-                        x.set(b.lookupVar(x.id()));
-                    }
-                    else {
-                        hs.add(service.createControl(x, c));
-                        if (tps.service.isFiniteSetOfInstances(x.type())){
-                            menuOnlyItems.push(new actions.ValuesMenu(x));
-                        }
-                    }
-
-                })
-                if (hs.children.length > 0) {
+                var hs = new controlPanel.CollectionControlPanel(b);
+                if (hs.visibleParameters().length>0) {
                     r.heading._style.padding = "5px"
                     hs._style.cssFloat = "right"
                     r.heading.add(hs);//
                 }
-                r.toolbar._style.marginTop = "3px";//
-
+                //r.toolbar._style.marginTop = "3px";//
             }
         }
         if (tps.service.isMultiSelect(b.type())) {

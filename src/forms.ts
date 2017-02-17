@@ -5,7 +5,7 @@ import uifactory=require("./uifactory")
 import IBinding=tps.IBinding
 import IPropertyGroup=tps.ts.IPropertyGroup;
 import wb=require("./workbench");
-import {IControl, Composite, VerticalFlex, HorizontalFlex} from "./controls";
+import {IControl, Composite, VerticalFlex, HorizontalFlex, IContributionItem} from "./controls";
 import {ISelectionProvider, ISelectionListener} from "./workbench";
 import {IValueListener, ChangeEvent, Binding, Status} from "raml-type-bindings";
 import {ListenableAction} from "./actions";
@@ -453,9 +453,11 @@ export class BindableComposite extends BindableControl {
 }
 
 export class Input extends BindableControl {
-    constructor() {
+    constructor(form:boolean=true) {
         super("input")
-        this.addClassName("form-control");
+        if (form) {
+            this.addClassName("form-control");
+        }
 
     }
 
@@ -465,10 +467,13 @@ export class Input extends BindableControl {
             if (v === undefined || v === null) {
                 v = "";
             }
+            if (tps.service.isSubtypeOf(this._binding.type(),tps.TYPE_DATE)){
+                v=tps.service.label(v,this._binding.type());
+            }
             el.value = "" + v;
         }
     }
-
+    di:boolean
     protected initBinding(ch: HTMLElement) {
         var el: HTMLInputElement = <HTMLInputElement>ch;
         if (this._binding) {
@@ -490,6 +495,8 @@ export class Input extends BindableControl {
                     this._element.setAttribute("step", "" + mm.step);
                 }
             }
+
+
             if (tps.service.isSubtypeOf(this._binding.type(), tps.TYPE_PASSWORD)) {
                 this._element.setAttribute("type", "password");
             }
@@ -500,6 +507,43 @@ export class Input extends BindableControl {
             }
             el.onchange = (e) => {
                 this._binding.set(el.value);
+            }
+        }
+    }
+
+    _typeaheadFunction:string | ((name: string, c: (v: string[]) => void)=>void)
+
+    onAttach(x){
+        super.onAttach(x);
+        var bnd=this._binding;
+        if (tps.service.isSubtypeOf(this._binding.type(),tps.TYPE_DATE)){
+
+            $("#" + this.id()).datetimepicker();
+            $("#" + this.id()).on("dp.change", function(e) {
+
+                bnd.set(moment(e.date).toISOString())
+            });
+
+        }
+        else {
+            var haste = this._typeaheadFunction || (<tps.metakeys.TypeAhead>this._binding.type()).typeahead;
+            var v = this
+            if (haste) {
+                var te = this._typeaheadFunction;
+                if (!te) {
+                    te = (<tps.metakeys.TypeAhead>this._binding.type()).typeahead;
+                }
+                if (typeof te == "string") {
+                    var typeAheadFunction = function (name: string, c: (v: string[]) => void) {
+                        c(tps.calcExpression(<string>te, v._binding))
+                    };
+                    te = typeAheadFunction
+                }
+                var w: any = window;
+                $("#" + this.id()).typeahead({
+                    source:te
+                })
+
             }
         }
     }
@@ -709,6 +753,7 @@ export class RadioSelect extends BindableControl {
         super.renderContent(e);
         var info = new EnumInfo(this._binding, true)
         var mm = document.createElement("div");
+        if (this.needLabel()){
         mm.appendChild(document.createTextNode(this._binding.type().displayName));
         var descr = this._binding.type().description;
         if (descr) {
@@ -718,6 +763,7 @@ export class RadioSelect extends BindableControl {
             h.render(mm);
         }
         mm.appendChild(document.createTextNode(':'));
+            }
         e.appendChild(mm);
         info.labels.forEach(x => {
             var input = document.createElement("input");
@@ -810,8 +856,8 @@ export class PagingControl extends BindableControl {
         }
 
         var total = paged.total();
-        var inside = paged.get();
-        if (total != -1 && (inside && inside.length >= total) || (paged.isLoading() && !this.lastTimeHasPaged)) {
+        var inside = paged.get();//
+        if (paged.hasAllData()||(total != -1 && (inside && inside.length >= total) || (paged.isLoading() && !this.lastTimeHasPaged))) {
             this.lastTimeHasPaged = false;
             return;
         }
@@ -1115,6 +1161,7 @@ export class Toolbar extends ActionPresenter implements IValueListener {
     constructor() {
         super("span")
         this._style.cssFloat = "right";
+        this._style.marginLeft="3px"
     }
 
     renderElement(e: HTMLElement) {
@@ -1153,11 +1200,15 @@ export class DropDown extends ActionPresenter implements IValueListener {
         this.items.forEach(x => {
             var res: any = {
                 name: x.title,
-                icons: x.image,
+                icon: x.image,
                 disabled: x.disabled,
                 callback: () => {
                     x.run()
                 }
+            }
+            if (x.checked){
+                res.icon="fa-check";
+                //res.selected="true"
             }
             if (x.items) {
                 var rr = new DropDown();
@@ -1601,6 +1652,7 @@ export abstract class AbstractListControl extends BindableControl implements ISe
 
     protected createNothingContent() {
         var comp = new controls.Composite("div");
+        comp._style.flex="1 1 0"
         comp._style.padding = "10px";
         comp.addLabel("Nothing here yet");
         return comp;
@@ -1656,6 +1708,7 @@ export abstract class AbstractListControl extends BindableControl implements ISe
     abstract toControl(v: any, position: number): controls.IControl;
 }
 import uif=require("./uifactory")
+import moment = require("moment");
 export abstract class BasicListControl extends AbstractListControl {
 
     constructor() {
@@ -1864,11 +1917,15 @@ export class ButtonMultiSelectControl extends AbstractListControl {
     }
 
     toControl(v: any): controls.IControl {
-        var lab = tps.service.label(v, this._binding.type());
+        var lab = tps.service.label(v, this._binding.collectionBinding().componentType());
         var rs = new Button(lab);
         rs._classNames = ["btn", "btn-xs", "btn-primary"]
         rs._style.margin = "3px";
         rs._style.cursor = "pointer";
+        var icon=tps.service.icon(v,this._binding.collectionBinding().componentType());
+        if (icon){
+            rs.addHTML(`<img src="${icon}" width="16px" style="margin-left: 3px;margin-right: 3px;margin-top:2px;float: left">`)
+        }
         rs.onClick = () => {
             if (!this.isSelected(v)) {
                 rs.removeClassName("btn-primary")
@@ -1898,6 +1955,7 @@ export class ButtonMultiSelectControl extends AbstractListControl {
         else {
             rs.addClassName("btn-primary");
         }
+
         return rs;
     }
 }
@@ -2112,6 +2170,121 @@ export class TableControl extends BasicListControl {
         return rs;
     }
 
+
+}
+export class PopoverSelect extends BindableControl{
+
+    constructor(private b:tps.IBinding,icon?:string,btnStyle:string="btn-success",private select=true,showTitle=true,private extra?:IControl){
+        super("div");
+        this._binding=b;
+        //this._style.marginTop="3px";
+        this._style.marginRight="3px";
+        var title=tps.service.caption(b.type());
+        var dialogTitle=title;
+        if (!showTitle){
+            title="";
+        }
+        var description=b.type().description;
+        if (!description){
+            description="";
+        }
+        var cl=b.get();
+        if (!cl){
+            cl=b.type().default;
+        }
+        var caption=tps.service.label(cl,b.type());
+
+        this.addHTML(`<div class="btn-group" id="${this.id()+"container"}">
+${select?`<button  type="button"  style="cursor: hand;" class="btn btn-xs ${btnStyle}">${icon?`<span style="position: relative;top:2px;margin-right: 2px" class="glyphicon ${icon}"></span>`:""}${title}:</button>`:""}
+<button href="#" id="${this.id()+"p"}"  type="button" class="btn btn-xs ${!select?btnStyle:"btn-default dropdown-toggle"} 
+aria-haspopup="true" aria-expanded="false" data-trigger="manual"
+
+title="${dialogTitle}"  data-content="${description}"><span id="${this.id()+'lc'}" >${showTitle?caption:""}</span>${select?`<span class="caret"></span>`:`<span class="glyphicon ${icon}"></span>${showTitle?title:""}`}</button>
+</div>`);
+    }
+    onAttach(e:HTMLElement){
+        var v=this.id()+'content';
+        var binding=this.b;
+        var id=this.id();
+        var visible=false;
+        if (this.extra){
+            this.extra.render(document.getElementById(this.id()+"container"))
+        }
+        document.getElementById(id+'p').onclick=(x)=>{
+            if (!visible) {
+                (<any>$("#" + id + 'p')).popover("show");//
+                visible=true;
+            }
+            else{
+                (<any>$("#" + id + 'p')).popover("hide");//
+                visible=false;
+            }
+            x.stopPropagation()
+        }
+        var options=this.getRenderingOptions();
+        (<any>$("#"+this.id()+'p')).popover({placement:"auto bottom",animation: false,template:`<div class="popover" role="tooltip">
+<div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content" style="min-width: 200px" id="${v}"></div></div>`})
+        $("#"+this.id()).on('shown.bs.popover', function (e) {
+            var content=document.getElementById(v);
+            var cm=new Composite("span");
+            cm._rendersLabel=true;
+            cm.add( uifactory.service.createControl(binding,options));
+            cm.render(content);
+            document.onmouseup=(x)=>{
+                var e=x.srcElement;
+                var found=false;
+                while (e){
+                    if (e==content){
+                        found=true;
+                    }
+                    if (e.id==id+'p'){
+                        found=true;
+                    }
+                    e=e.parentElement;
+
+                }
+                if (!found){
+                    (<any>$("#"+id+'p')).popover("hide");
+                    visible=false;
+                    //x.stopPropagation();
+                }
+            }
+            //content.innerHTML=content.innerHTML+"<a style='background: rebeccapurple;height: 300px' > HEllo world</a>"
+        })
+        super.onAttach(e);
+    }
+
+    updateFromValue(){
+        if (!this.select){
+            return;
+        }
+        var el=document.getElementById(this.id()+'lc');
+        if (el){
+            var cl=this.b.get();
+            if (!cl){
+                cl=this.b.type().default;
+            }
+            var original=(<tps.Binding>this.b).fromReferenceToOriginal(cl);
+            var tp=this.b.type();
+            if (original){
+                cl=original;
+                var rt=(<tps.Binding>this.b).referencedType();
+                if (rt){
+                    tp=rt;
+                }
+            }
+            var caption=tps.service.label(cl,tp);
+            el.innerText=caption;
+            var icon=tps.service.icon(cl,tp);
+            if (icon){
+                el.innerHTML=el.innerHTML+(`<img src="${icon}" width="16px" style="margin-left: -3px;margin-right: 3px;margin-top:2px;float: left">`)
+            }
+            //(<any>$("#"+this.id()+'p')).popover("hide");
+        }
+    }
+    initBinding(){
+
+    }
 
 }
 
