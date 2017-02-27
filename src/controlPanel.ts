@@ -1,6 +1,8 @@
 import forms=require("./forms");
 import uifactory=require("./uifactory")
 import controls=require("./controls")
+import actions=require("./actions")
+
 import rt=require("raml-type-bindings")
 import ro=require("./renderingOptions")
 import {Composite} from "./controls";
@@ -18,6 +20,100 @@ interface CollectionConfig{
 
 
 }
+export class ClearFilterAction extends actions.CollectionAction{
+
+    constructor(private f:rt.metakeys.Filter,c:Binding,private filterBinding:IBinding){
+        super(c);
+        this.startListening();
+        this.valueChanged(null);
+    }
+    run(){
+        var vl="";
+        if (this.f.filter.noFilterValue){
+            vl=this.f.filter.noFilterValue
+        }
+        this.filterBinding.set(vl);
+    }
+    valueChanged(e:rt.ChangeEvent){
+        super.valueChanged(e);
+        this.title=this.defaultTitle();
+
+    }
+
+    defaultTitle(){
+        if (!this.f){
+            return "Filter";
+        }
+        var pt=rt.service.property(this.depBnd.type(),this.f.filter.property);
+        var pc=rt.service.caption(pt).toLowerCase();
+        return "Clear "+rt.service.caption(this.filterBinding.type()).toLowerCase()+" filter";//
+    }
+
+    isEnabled(){
+        if (this.filterBinding) {
+            return this.filterBinding.get()&&((this.filterBinding.get()!=this.f.filter.noFilterValue)||(!this.f.filter.noFilterValue));
+        }
+        return true;//
+    }
+}
+export class FilterAction extends actions.CollectionAction{
+
+    constructor(private f:rt.metakeys.Filter,c:Binding,private filterBinding:IBinding){
+        super(c);
+        this.startListening();
+        this.valueChanged(null);
+    }
+    run(){
+        var vl=this.depBnd.get();
+        var filterVal = rt.service.getValue(this.depBnd.type(),vl, this.f.filter.property, this.depBnd);
+        filterVal=rt.service.convert(this.filterBinding.type(),this.depBnd.binding(this.f.filter.property).type(),filterVal)
+        this.filterBinding.set(filterVal);
+    }
+    valueChanged(e:rt.ChangeEvent){
+        super.valueChanged(e);
+        this.title=this.defaultTitle();
+    }
+
+    defaultTitle(){
+        if (!this.f){
+            return "Filter";
+        }
+        var vl=this.depBnd.get();
+
+        if (vl) {
+            var filterVal = rt.service.getValue(this.depBnd.type(),vl, this.f.filter.property, this.depBnd);
+            var opName=""
+            switch (this.f.filter.op){
+                case "eq":
+                    opName="equal";
+                    break
+                case "neq":
+                    opName="equal";
+                    break
+                case "lt":
+                    opName="less then";
+                    break
+                case "gt":
+                    opName="greater then";
+                    break
+                case "le":
+                    opName="less or equal then";
+                    break
+                case "ge":
+                    opName="greater or equal then";
+                    break
+            }
+            var pt=rt.service.property(this.depBnd.type(),this.f.filter.property);
+            var pc=rt.service.caption(this.filterBinding.type()).toLowerCase();
+            var nm="Constraint items to "+pc+" "+opName+" "+rt.service.label(filterVal,pt)
+            return nm;
+        }
+    }
+
+    isEnabled(){
+        return this.depBnd.get()!==undefined&&this.depBnd.get()!==null;
+    }
+}
 
 export class CollectionControlPanel extends controls.HorizontalFlex implements IValueListener{
     //ordering
@@ -31,14 +127,66 @@ export class CollectionControlPanel extends controls.HorizontalFlex implements I
     //sort control
 
     //state
-
+    private layout:rt.metakeys.ParametersLayout;
     private config: CollectionConfig
 
     constructor(private view:rt.ViewBinding){
         super();
         this._style.display="inline-flex";
+        this.layout=<rt.metakeys.ParametersLayout>view.type();
     }
     psComposite:controls.Composite=new controls.Composite("span");
+
+    _menu:controls.IContributionItem[];
+
+    contribute():controls.IContributionItem[]{
+
+        if(!this._menu) {
+            var filters:controls.IContributionItem={
+                id:"filters",
+                title: "Filters",
+                image:"fa-filter",
+                items:[]
+            }
+            var allItems:controls.IContributionItem[]=[];
+
+            var rs: controls.IContributionItem[] = []
+            this.allConfigurableParameters().forEach(x => {
+                if (x.enumeratedValues()) {
+                    var menu=new actions.ValuesMenu(<rt.Binding>x);
+                    if ((<rt.metakeys.Filter>x.type()).filter){
+                        filters.items.push(menu);
+                    }
+                    if ((<rt.metakeys.Ordering>x.type()).ordering){
+                        menu.image="fa-sort-numeric-desc"
+                        allItems.push(menu);
+                    }
+                    //menu.image="fa-filter";
+
+                }
+                else{
+                    var mm=<rt.metakeys.Filter>x.type();
+                    if (mm.filter){
+                        if (mm.filter.op&&mm.filter.property){
+                            var lm={
+                                title:rt.service.caption(x.type()),
+                                items:[new FilterAction(mm,this.view,x),new ClearFilterAction(mm,this.view,x)]
+                            }
+                            filters.items.push(lm);
+                        }
+                    }
+                }
+            })
+            if (filters.items.length>0){
+                allItems.push(filters);
+            }
+            allItems=allItems.reverse();
+            this._menu = allItems;
+        }
+
+        return this._menu;
+
+    }
 
     visiblePars:any
     renderChildren(e:HTMLElement){
@@ -53,14 +201,17 @@ export class CollectionControlPanel extends controls.HorizontalFlex implements I
             properties:{}
         };
         this.allConfigurableParameters().forEach(x=>{
-            ptype.properties[x.id()]={ id:x.id(), displayName:rt.service.caption(x.type()),type:"boolean"};
+            ptype.properties[x.id()]={ id:"", displayName:rt.service.caption(x.type()),type:"boolean"};
         })
         tp._type=ptype;
         tp.value=this.visiblePars;
         tp.addListener(this);
-        var b=new forms.PopoverSelect(tp,"glyphicon-cog","btn-success",false,false);
 
-        this.children.push(b);
+        var b=new forms.PopoverSelect(tp,"glyphicon-cog","btn-success",false,false);
+        if (this.layout.parametersLayout&&this.layout.parametersLayout.allowConfiguration!==false){
+            this.children.push(b);
+        }
+
         super.renderChildren(e);
     }
 
@@ -211,11 +362,23 @@ export class CollectionControlPanel extends controls.HorizontalFlex implements I
         var pms:rt.IBinding[]=[]
         if (!this.visiblePars) {
             this.visiblePars={};
-            this.allConfigurableParameters().forEach(x => {
-                if (this.config && this.config.visibleFilters.indexOf(x.id()) != -1) {
-                    pms.push(x);
-                    return;
+            var initialVisibility=false;
+            if (this.layout.parametersLayout){
+                if (this.layout.parametersLayout.initiallyVisible){
+                    this.layout.parametersLayout.initiallyVisible.forEach(s=>{
+                        initialVisibility=true;
+                        this.allConfigurableParameters().forEach(p=>{
+                            if (p.id()==s){
+                                pms.push(p);
+                            }
+                        })
+                    })
                 }
+            }
+            if (!initialVisibility){
+            this.allConfigurableParameters().forEach(x => {
+
+
                 if (x.type().required && !x.type().default) {
                     pms.push(x);
 
@@ -229,12 +392,28 @@ export class CollectionControlPanel extends controls.HorizontalFlex implements I
                     pms.push(x);
                     return true;
                 }
-            })
+            })}
 
         }
         else{
+            var already:string[]=[]
+            if (this.layout.parametersLayout){
+                if (this.layout.parametersLayout.initiallyVisible){
+                    this.layout.parametersLayout.initiallyVisible.forEach(s=>{
+                        initialVisibility=true;
+                        this.allConfigurableParameters().forEach(p=>{
+                            if (p.id()==s){
+                                if (this.visiblePars[p.id()]) {
+                                    pms.push(p);
+                                    already.push(p.id())
+                                }
+                            }
+                        })//
+                    })
+                }
+            }
             this.allConfigurableParameters().forEach(x => {
-                if (this.visiblePars[x.id()]){
+                if (this.visiblePars[x.id()]&&already.indexOf(x.id())==-1){
                     pms.push(x);
                 }
             })

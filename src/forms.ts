@@ -7,7 +7,7 @@ import IPropertyGroup=tps.ts.IPropertyGroup;
 import wb=require("./workbench");
 import {IControl, Composite, VerticalFlex, HorizontalFlex, IContributionItem} from "./controls";
 import {ISelectionProvider, ISelectionListener} from "./workbench";
-import {IValueListener, ChangeEvent, Binding, Status} from "raml-type-bindings";
+import {IValueListener, ChangeEvent, Binding, Status, ViewBinding, metakeys} from "raml-type-bindings";
 import {ListenableAction} from "./actions";
 import auth=require("./auth")
 
@@ -268,6 +268,16 @@ export abstract class BindableControl extends controls.Composite {
 
     private oldVal;
 
+    title(){
+        var rrr=super.title();
+        if (!rrr){
+            if (this._binding){
+                return tps.service.caption(this._binding.type());
+            }
+        }
+        return rrr;
+    }
+
     protected updateVisibility() {
         this.setVisible(tps.service.isVisible(this._binding.type(), this._binding));
         var m: tps.metakeys.VisibleWhen&tps.metakeys.DisabledWhen = this._binding.type();
@@ -470,6 +480,7 @@ export class Input extends BindableControl {
             if (tps.service.isSubtypeOf(this._binding.type(),tps.TYPE_DATE)){
                 v=tps.service.label(v,this._binding.type());
             }
+
             el.value = "" + v;
         }
     }
@@ -503,7 +514,13 @@ export class Input extends BindableControl {
 
             el.value = val;
             el.onkeyup = (e) => {
-                this._binding.set(el.value);
+                var q=el.value;
+                if (tps.service.isSubtypeOf(this._binding.type(),tps.TYPE_DATEONLY)){
+                    this._binding.set(moment(q).format("YYYY-MM-DD"))
+                }
+                else {
+                    this._binding.set(q);
+                }
             }
             el.onchange = (e) => {
                 this._binding.set(el.value);
@@ -517,11 +534,19 @@ export class Input extends BindableControl {
         super.onAttach(x);
         var bnd=this._binding;
         if (tps.service.isSubtypeOf(this._binding.type(),tps.TYPE_DATE)){
-
-            $("#" + this.id()).datetimepicker();
+            if (tps.service.isSubtypeOf(bnd.type(),tps.TYPE_DATEONLY)){
+                $("#" + this.id()).datetimepicker({format:"YYYY-MM-DD"});
+            }
+            else {
+                $("#" + this.id()).datetimepicker();
+            }
             $("#" + this.id()).on("dp.change", function(e) {
-
-                bnd.set(moment(e.date).toISOString())
+                if (tps.service.isSubtypeOf(bnd.type(),tps.TYPE_DATEONLY)){
+                    bnd.set(moment(e.date).format("YYYY-MM-DD"))
+                }
+                else {
+                    bnd.set(moment(e.date).toISOString())
+                }
             });
 
         }
@@ -534,8 +559,9 @@ export class Input extends BindableControl {
                     te = (<tps.metakeys.TypeAhead>this._binding.type()).typeahead;
                 }
                 if (typeof te == "string") {
+                    var code=te;
                     var typeAheadFunction = function (name: string, c: (v: string[]) => void) {
-                        c(tps.calcExpression(<string>te, v._binding))
+                        c(tps.calcExpression(code, v._binding))
                     };
                     te = typeAheadFunction
                 }
@@ -991,6 +1017,39 @@ export class MasterDetails extends controls.HorizontalFlex {
 
     private createDetails(lst: AbstractListControl) {
         var bnd = lst.selectionBinding();
+
+        var tp=bnd.type();
+        if (tp.details&&tp.details.length>0){
+            var details=tp.details[0];
+            var tpp=tps.service.resolvedType(details);
+            console.log(tpp);
+            (<tps.Binding>bnd)._type=(<tps.Operation>tpp).result;
+            var bn=new tps.OperationBinding(<tps.Operation>tpp,<tps.Binding>bnd);
+            bnd.addListener({
+                valueChanged(){
+                    //bn.changed();
+                    var value=bnd.get();
+                    bn.execute(x=>{
+                        var vl=bnd.get();
+                        if (value==vl) {
+                            if (vl&&!Array.isArray(vl)) {
+                                Object.keys(x).forEach(k=>{
+                                    vl[k]=x[k];
+                                    (<tps.Binding>bnd).refreshChildren();
+                                })
+                            }
+                        }
+
+                    })
+                }
+            })
+            // bn.addListener({
+            //     valueChanged(){
+            //         console.log(bn.get());
+            //     }
+            // })
+
+        }
         this._style.flex = "1 1 0";
         var cm1 = new BindableComposite("div");
         cm1._binding = bnd;
@@ -1171,6 +1230,10 @@ export class Toolbar extends ActionPresenter implements IValueListener {
     }
 }
 declare var $: any;
+
+export interface MenuContributor{
+    contribute():IContributionItem[]
+}
 export class DropDown extends ActionPresenter implements IValueListener {
 
     constructor() {
@@ -1179,7 +1242,7 @@ export class DropDown extends ActionPresenter implements IValueListener {
     }
 
     ownerId: string;
-
+    contributors: MenuContributor[]=[]
     onAttach() {
         super.onAttach()
         this.valueChanged(null);
@@ -1197,7 +1260,9 @@ export class DropDown extends ActionPresenter implements IValueListener {
 
     mapItems() {
         var result: any = {}
-        this.items.forEach(x => {
+        var ms=this.items;
+        this.contributors.forEach(x=>{ms=ms.concat(x.contribute())})
+        ms.forEach(x => {
             var res: any = {
                 name: x.title,
                 icon: x.image,
@@ -1477,8 +1542,23 @@ export abstract class AbstractListControl extends BindableControl implements ISe
     }
 
     setSelectionIndex(n: number) {
-        this.collection().setSelectionIndex(n);
-        this.sl.forEach(x => x.selectionChanged(this.getSelection()));
+        if (this.collection().groupBy()){
+            var vl=this.lastContent[n];
+            if(vl instanceof tps.HasType){
+                var ex=this.collection().expanded(vl);
+                if (ex){
+                    this.collection().collapse(vl);
+                }
+                else{
+                    this.collection().expand(vl);
+                }
+                return;
+            }
+        }
+         {
+            this.collection().setSelectionIndex(n);
+            this.sl.forEach(x => x.selectionChanged(this.getSelection()));
+        }
     }
 
     setSelection(v: any[], refresh = true) {
@@ -1533,13 +1613,32 @@ export abstract class AbstractListControl extends BindableControl implements ISe
         if (e && e.subKind == "selection") {
             //selection need to be updated;
             if (e.oldValue && e.newValue) {
+                var suc=true;
                 for (var i = 0; i < e.oldValue.length; i++) {
-                    this.update(this.lastContent.indexOf(e.oldValue[i]));
+                    let found=false;
+                    for (var j=0;j<this.lastContent.length;j++){
+                        if (this.lastContent[j]==e.oldValue[i]){
+                            found=true;
+                            this.update(j);
+                        }
+                    }
+                    if (!found){
+                        suc=false;
+                    }
                 }
                 for (var i = 0; i < e.newValue.length; i++) {
-                    this.update(this.lastContent.indexOf(e.newValue[i]));
+                    let found=false;
+                    for (var j=0;j<this.lastContent.length;j++){
+                        if (this.lastContent[j]==e.newValue[i]){//
+                            found=true;
+                            this.update(j);
+                        }
+                    }
+                    if (!found){
+                        suc=false;
+                    }
                 }
-                return true;
+                return suc;
             }
         }
         return false;
@@ -1623,7 +1722,7 @@ export abstract class AbstractListControl extends BindableControl implements ISe
                 }
             }
         }
-        var ac = this._binding.collectionBinding().workingCopy();
+        var ac = this.content();
         this.children = []
         var c = this.createHeader();
         if (c) {
@@ -1649,6 +1748,12 @@ export abstract class AbstractListControl extends BindableControl implements ISe
         }
         this.refresh();
     }
+
+    protected content() {
+        return this.collection().workingCopy();
+    }
+
+
 
     protected createNothingContent() {
         var comp = new controls.Composite("div");
@@ -1710,52 +1815,6 @@ export abstract class AbstractListControl extends BindableControl implements ISe
 import uif=require("./uifactory")
 import moment = require("moment");
 export abstract class BasicListControl extends AbstractListControl {
-
-    constructor() {
-        super("div")
-        this.addClassName("list-group");
-        this._style.display = "flex";
-        this._style.margin = "0px";
-        this._style.flexDirection = "column"
-        this._style.overflowX = "hidden";
-        this._style.flex = "1 1 0";
-    }
-
-    createBody(): controls.Composite {
-        var bd = new Composite("div");
-        bd._style.overflowY = "auto"
-        bd.addClassName("table");
-        bd.addClassName("table-striped");
-        bd._style.flex = "1 1 auto";
-        bd._style.margin = "0";
-        return bd;
-    }
-
-
-    public dataRefresh(e: tps.ChangeEvent) {
-        if (this.tryHandleSelection(e)) {
-            return;
-        }
-        this.contentPrepared = false;
-        var vc = this._binding.collectionBinding().workingCopy();
-        if (this.children.indexOf(this.body) == -1 || vc.length == 0 || this._binding.isError() || this._binding.accessControl().needsAuthentification()) {
-            super.dataRefresh();
-        }
-        else if (this.body) {
-            this.body.children = [];
-            this.fillBody(vc, this.body);
-            this.contentPrepared = true;
-            this.body.refresh()
-            if (this.footer) {
-                this.footer.refresh();
-            }
-        }
-    }
-}
-
-
-export class SimpleListControl extends BasicListControl {
-
 
     layoutToControl(c: controls.Composite, l: tps.decorators.LayoutElement, num: number) {
         if (l.type == "part") {
@@ -1829,6 +1888,82 @@ export class SimpleListControl extends BasicListControl {
             }
         }
     }
+    constructor() {
+        super("div")
+        this.addClassName("list-group");
+        this._style.display = "flex";
+        this._style.margin = "0px";
+        this._style.flexDirection = "column"
+        this._style.overflowX = "hidden";
+        this._style.flex = "1 1 0";
+    }
+    protected appendGroupBy(position:number, rs: Composite, v: any, sel: boolean) {
+        if (this.collection().groupBy() || this.collection().tree()) {
+            var ll = this.collection().levels()[position];
+            if (ll) {
+                rs._style.paddingLeft = (30 * ll) + "px";
+            }
+            var chld = this.collection().children(v);
+            var expanded = this.collection().expanded(v);
+            if (chld.length > 0) {
+                var c: controls.Composite = null;
+                if (!expanded) {
+                    c = rs.addHTML("<span class='glyphicon glyphicon-chevron-right' style='margin-right: 5px'></span>")
+                    if (this.collection().tree()) {
+                        c.onClick = (c) => this.collection().expand(v)
+
+                    }
+                }
+                else {
+                    c = rs.addHTML("<span class='glyphicon glyphicon-chevron-down' style='margin-right: 5px'></span>")
+                    if (this.collection().tree()) {
+                        c.onClick = (c) => this.collection().collapse(v)//
+                    }
+                }
+
+            }
+            if (!sel && this.collection().groupBy() && chld.length > 0) {
+                rs._classNames.push("groupNode");
+            }
+        }
+    }
+
+    createBody(): controls.Composite {
+        var bd = new Composite("div");
+        bd._style.overflowY = "auto"
+        bd.addClassName("table");
+        bd.addClassName("table-striped");
+        bd._style.flex = "1 1 auto";
+        bd._style.margin = "0";
+        return bd;
+    }
+
+
+    public dataRefresh(e: tps.ChangeEvent) {
+        if (this.tryHandleSelection(e)) {
+            return;
+        }
+        this.contentPrepared = false;
+        var vc = this._binding.collectionBinding().workingCopy();
+        if (this.children.indexOf(this.body) == -1 || vc.length == 0 || this._binding.isError() || this._binding.accessControl().needsAuthentification()) {
+            super.dataRefresh();
+        }
+        else if (this.body) {
+            this.body.children = [];
+            this.fillBody(vc, this.body);
+            this.contentPrepared = true;
+            this.body.refresh()
+            if (this.footer) {
+                this.footer.refresh();
+            }
+        }
+    }
+}
+
+
+export class SimpleListControl extends BasicListControl {
+
+
 
     toControl(v: any, position): controls.IControl {
         this.elbnd.value = v;
@@ -1836,16 +1971,23 @@ export class SimpleListControl extends BasicListControl {
         var rs = new Composite("li")
         rs.addClassName("list-group-item")
         rs.addClassName("noRoundBorder")
+        var sel=this.isSelected(v);
+        this.appendGroupBy(position, rs, v, sel);
         if (position == 0) {
             rs._style.borderTopWidth = "0px";
         }
         rs._style.cursor = "pointer";
-        if (this.isSelected(v)) {
+        if (sel) {
             rs.addClassName("active");
         }
         var layout = tps.decorators.calculateLayout(this.elbnd);
         if (layout) {
-            this.layoutToControl(rs, layout, 0);
+            var mm=rs;
+            if ((<any>layout).background){
+                mm=new Composite("span");
+                rs.add(mm);
+            }
+            this.layoutToControl(mm, layout, 0);
         }
         else {
             //console.log(JSON.stringify(layout));
@@ -1861,9 +2003,33 @@ export class SimpleListControl extends BasicListControl {
         }
         return rs;
     }
-
-
 }
+
+export class FullRenderList extends BasicListControl {
+
+
+    constructor() {
+        super();
+        this._style.flex="0 0";
+    }
+    createNothingContent(){
+        return new Composite("span");
+    }
+
+    toControl(v: any, position): controls.IControl {
+        var bnd=new tps.Binding("item");
+        bnd.value=v;
+        if (!this._binding.accessControl().canEditItem(v)){
+            bnd.readonly=true;//
+            bnd.immutable=true;
+
+        }
+        bnd._type=this.elbnd.type();
+        var cntrl=uifactory.service.createControl(bnd,this.getRenderingOptions());
+        return cntrl;
+    }
+}
+
 export class ButtonMultiSelectControl extends AbstractListControl {
 
     protected createNothingContent() {
@@ -1892,7 +2058,13 @@ export class ButtonMultiSelectControl extends AbstractListControl {
     setSingle(single: boolean) {
         this._single = single;
     }
-
+    protected content() {
+        var cnt= this.collection().workingCopy();
+        if (cnt.length==0){
+            return this.collection().getSelection();
+        }
+        return cnt;
+    }
     needLabel() {
         if (this.parent) {
             if (this.parent.rendersLabel(this)) {
@@ -1926,27 +2098,32 @@ export class ButtonMultiSelectControl extends AbstractListControl {
         if (icon){
             rs.addHTML(`<img src="${icon}" width="16px" style="margin-left: 3px;margin-right: 3px;margin-top:2px;float: left">`)
         }
-        rs.onClick = () => {
-            if (!this.isSelected(v)) {
-                rs.removeClassName("btn-primary")
-                rs.addClassName("btn-success");
-
-                var mm = [v].concat(this.getSelection());
-                if (this._single) {
-                    mm = [v];
-                }
-                this.setSelection(mm);
-            }
-            else {
-                if (this._single) {
-                    this.setSelection([]);
+        if (true) {
+            rs.onClick = () => {
+                if (!this._binding.collectionBinding().selectionBinding().accessControl().canEditSelf()){
                     return;
                 }
-                rs.addClassName("btn-primary")
-                rs.removeClassName("btn-success");
-                var mm = [].concat(this.getSelection());
-                mm = mm.filter(x => !tps.service.isSame(x, v, this.componentType()));
-                this.setSelection(mm);
+                if (!this.isSelected(v)) {
+                    rs.removeClassName("btn-primary")
+                    rs.addClassName("btn-success");
+
+                    var mm = [v].concat(this.getSelection());
+                    if (this._single) {
+                        mm = [v];
+                    }
+                    this.setSelection(mm);
+                }
+                else {
+                    if (this._single) {
+                        this.setSelection([]);
+                        return;
+                    }
+                    rs.addClassName("btn-primary")
+                    rs.removeClassName("btn-success");
+                    var mm = [].concat(this.getSelection());
+                    mm = mm.filter(x => !tps.service.isSame(x, v, this.componentType()));
+                    this.setSelection(mm);
+                }
             }
         }
         if (this.isSelected(v)) {
@@ -2148,15 +2325,41 @@ export class TableControl extends BasicListControl {
         if (sel) {
             rs.addClassName("active")//
         }
+
         ps.forEach((p, i) => {
             var td = new Composite("div");
             td._style.display = "inline"
             td._style.flex = this.calcFlex(p);
             td.addClassName("col")
-            this.addIcon(v, td, i);
-            this.addInstanceLabel(tps.service.getValue(p.type, v, p.id), td, p.type)
+            var has=false;
+            if (this.collection().groupBy() || this.collection().tree()){
+                if (this.collection().children(v).length>0) {
+                    if (i==0) {
+                        this.appendGroupBy(position, rs, v, sel);
+                        has=true;
+                        var layout = tps.decorators.calculateLayout(this.elbnd);
+                        if (layout) {
+                            var mm = td;
+                            if ((<any>layout).background) {
+                                mm = new Composite("span");
+                                rs.add(mm);
+                            }
+                            this.layoutToControl(mm, layout, 0);
+                        }
+                    }
+                    if (i!=0){
 
+                        return;
+                    }
+                    //return rs;
+                }
+            }
+            if (!has) {
+                this.addIcon(v, td, i);
+                this.addInstanceLabel(tps.service.getValue(p.type, v, p.id), td, p.type)
+            }
             if (i == 0) {
+
                 if (this.hasError(position)) {
                     td.addHTML(ERROR);
                 }
@@ -2228,7 +2431,9 @@ title="${dialogTitle}"  data-content="${description}"><span id="${this.id()+'lc'
             var content=document.getElementById(v);
             var cm=new Composite("span");
             cm._rendersLabel=true;
-            cm.add( uifactory.service.createControl(binding,options));
+            let opt=ro.clone(options);
+            opt.maxValuesForRadio=15
+            cm.add( uifactory.service.createControl(binding,opt));
             cm.render(content);
             document.onmouseup=(x)=>{
                 var e=x.srcElement;
@@ -2335,8 +2540,7 @@ export class CheckBox extends BindableControl {
         ch.appendChild(lab)
     }
 }
-export class BindedLabel extends BindableControl {
-
+export class BindedReadonly extends BindableControl{
     initBinding() {
         if (this._binding) {
             this.setTitle(tps.service.caption(this._binding.type()));
@@ -2367,18 +2571,151 @@ export class BindedLabel extends BindableControl {
     needsVerticalScroll() {
         return false;
     }
+}
+export class BindedLink extends BindedReadonly {
+
 
     renderContent(c: HTMLElement) {
         super.renderContent(c);
         if (this._binding) {
             var vl = this._binding.get();
             var cnt = tps.service.label(vl, this._binding.type());
-            if (!(<tps.metakeys.Label>this._binding.type()).htmlLabel) {
+
+            // if (this.needLabel()) {
+            //     cnt = "<span class='fieldCaption' style='display: inline'>" + this.title() + ":</span><span class='fieldValue' style='margin-left: 5px'>" + cnt + "</span>";
+            // }
+            if (vl) {
+                var uheader="https://www.youtube.com/watch?v=";
+                var uheader1="http://www.youtube.com/watch?v=";
+                var alternative="https://youtu.be/"
+                if ((""+vl).startsWith(uheader)){
+                    c.innerHTML=`<iframe width="300" height="200" src="https://www.youtube.com/embed/${(""+vl).substring(uheader.length)}" frameborder="0" allowfullscreen></iframe>`
+                }
+                else if ((""+vl).startsWith(uheader1)){
+                    c.innerHTML=`<iframe width="300" height="200" src="https://www.youtube.com/embed/${(""+vl).substring(uheader1.length)}" frameborder="0" allowfullscreen></iframe>`
+                }
+                else if ((""+vl).startsWith(alternative)){
+                    c.innerHTML=`<iframe width="300" height="200" src="https://www.youtube.com/embed/${(""+vl).substring(alternative.length)}" frameborder="0" allowfullscreen></iframe>`
+                }
+                else {//
+                    c.innerHTML = `<a style="padding: 4px" href="${vl}">${this.title()}</a>`;
+                }
+            }
+        }
+    }
+}
+
+export class BindedImage extends BindedReadonly {
+
+    constructor(){
+        super("span")
+    }
+    renderContent(c: HTMLElement) {
+        super.renderContent(c);
+        if (this._binding) {
+            var vl = this._binding.get();
+            var cnt = tps.service.label(vl, this._binding.type());
+
+            if (this.needLabel()) {
+                cnt = "<span class='fieldCaption' style='display: inline'>" + this.title() + ":</span><span class='fieldValue' style='margin-left: 5px'>" + cnt + "</span>";
+            } //
+            if (vl) {
+                c.innerHTML = `<img height="150px" src="${vl}"></img>`;
+            }
+        }
+    }
+}
+export class BindedFrame extends BindedReadonly {
+
+    constructor(){
+        super("span")
+    }
+    renderContent(c: HTMLElement) {
+        super.renderContent(c);
+        if (this._binding) {
+            var vl = this._binding.get();
+            var cnt = tps.service.label(vl, this._binding.type());
+
+            if (this.needLabel()) {
+                cnt = "<span class='fieldCaption' style='display: inline'>" + this.title() + ":</span><span class='fieldValue' style='margin-left: 5px'>" + cnt + "</span>";
+            } //
+            if (vl) {
+                c.innerHTML = `<iframe width="100%" src="${vl}"></iframe>`;
+            }
+        }
+    }
+}
+export class BindedCode extends BindedReadonly {
+
+    constructor(){
+        super("pre")
+    }
+    renderContent(c: HTMLElement) {
+        super.renderContent(c);
+        if (this._binding) {
+            var vl = this._binding.get();
+            if (!vl){
+                vl=""
+            }
+            var language=(<any>this._binding.type()).language;
+            if (language){
+                if (this._binding.parent()){
+                    var val=this._binding.parent().lookupVar(language);
+                    if (val&&val[language]){
+                        language=val[language];
+                    }
+                }
+            }
+            else language="javascript"
+            c.innerHTML="<code class='"+language+"'>"+controls.escapeHtml(vl)+"</code>";
+            setTimeout(function () {
+                if ((<any>window).hljs) {
+                    (<any>window).hljs.highlightBlock(c)
+                }
+            },100)
+        }
+    }
+}
+
+
+export class BindedLabel extends BindedReadonly {
+
+    onAttach(x){
+        super.onAttach(x);
+    }
+
+    renderContent(c: HTMLElement) {
+        super.renderContent(c);
+        if (this._binding) {
+            var vl = this._binding.get();
+
+            var cnt = tps.service.label(vl, this._binding.type());
+
+            if (!(<tps.metakeys.Label>this._binding.type()).htmlLabel&&!tps.service.isSubtypeOf(this._binding.type(),tps.TYPE_HTML)) {
                 cnt = controls.escapeHtml(cnt);
+            }
+            if (this._binding.parent()){
+                var label=(<tps.metakeys.Label>this._binding.parent().type()).label;
+                var id=this._binding.id();
+                if (label==id||(!label&&(id=="name"||id=="title"||id=="label"))){
+                    var options=this.getRenderingOptions();
+                    if (options.level<=3) {
+                        cnt = "<h3>" + cnt + "</h3>"
+                        c.innerHTML = cnt;
+                        return;
+                    }
+                    if (options.level<=6){
+                        cnt = "<h5>" + cnt + "</h5>"
+                        c.innerHTML = cnt;
+                        return;
+                    }
+
+                }
             }
             if (this.needLabel()) {
                 cnt = "<span class='fieldCaption' style='display: inline'>" + this.title() + ":</span><span class='fieldValue' style='margin-left: 5px'>" + cnt + "</span>";
             }
+
             c.innerHTML = `<span style="padding: 4px">${cnt}</span>`;
         }
     }

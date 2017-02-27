@@ -58,6 +58,28 @@ const UnionControlFactory: IControlFactory = {
         return s;
     }
 }
+const URLControlFactory: IControlFactory={
+    createControl(b: IBinding, r?: RenderingContext){
+        if (b.accessControl().canEditSelf()){
+            return StringControlFactory.createControl(b,r);
+        }
+        else{
+            var bLink=new forms.BindedLink("span");
+            if (tps.service.isSubtypeOf(b.type(),tps.TYPE_HTMLURL)){
+                //bLink=new forms.BindedFrame();
+            }
+            if (tps.service.isSubtypeOf(b.type(),tps.TYPE_IMAGEURL)){//
+                bLink=new forms.BindedImage();
+            }
+
+            bLink._binding=b;
+            return bLink;
+        }
+        //return null;
+    }
+}
+tps.declareMeta(tps.TYPE_URL, URLControlFactory);
+
 tps.declareMeta(tps.TYPE_UNION, UnionControlFactory);
 tps.declareMeta(tps.TYPE_BOOLEAN, BooleanControlFactory);
 declare var $: any
@@ -67,6 +89,12 @@ const StringControlFactory: IControlFactory = {
             return referenceControl(b);
         }
         if (!b.accessControl().canEditSelf()) {
+            var hh=tps.service.isSubtypeOf(b.type(),tps.TYPE_CODE);
+            if (hh){
+                var mmm=new forms.BindedCode("div");
+                mmm._binding=b;
+                return mmm; //
+            }
             var bl = new forms.BindedLabel("div");
             bl._binding = b;
             return bl;
@@ -95,7 +123,11 @@ const StringControlFactory: IControlFactory = {
         var mm: tps.FullTypeOptions = <any>b.type();
         if ((mm.enum || mm.enumValues)) {
             if (mm.enum) {
-                if (mm.enum.length < 6 && rc.kind != "filter") {
+                var mv=rc.maxValuesForRadio;
+                if (mv===null||mv===undefined){
+                    mv=6;
+                }
+                if (mm.enum.length < mv && rc.kind != "filter") {
                     var res = new RadioSelect()
                     res._binding = b;
                     return res;
@@ -146,6 +178,7 @@ const ArrayControlFactory: IControlFactory = {
 
         var params = (<tps.Operation>b.type()).parameters;
         var menuOnlyItems=[]
+        var contributors:forms.MenuContributor[]=[]
         if (b instanceof tps.ViewBinding) {
             var ps = b.parameterBindings();
             if (ps.length > 0) {
@@ -154,6 +187,7 @@ const ArrayControlFactory: IControlFactory = {
                     r.heading._style.padding = "5px"
                     hs._style.cssFloat = "right"
                     r.heading.add(hs);//
+                    contributors.push(hs)
                 }
                 //r.toolbar._style.marginTop = "3px";//
             }
@@ -194,6 +228,11 @@ const ArrayControlFactory: IControlFactory = {
         var props = tps.service.visibleProperties(b.collectionBinding().componentType());
         var repre = <any>b.type();
         var representation = repre.representation;
+        if (representation=="elements"){
+            var result=new forms.FullRenderList();
+            result._binding=b;
+            return result;//
+        }//
         if (props.length > 1) {
             var repre = <any>b.type();
             if (representation != "list" && representation != "list-only") {
@@ -223,6 +262,7 @@ const ArrayControlFactory: IControlFactory = {
         r.toolbar.items = items;
         var dr = new forms.DropDown();
         dr.items = items.concat(menuOnlyItems);
+        dr.contributors=contributors;
         dr.addTo(lst);
         let v = (v: boolean) => {
             r.setVisible(v)
@@ -327,7 +367,7 @@ export class DisplayManager {
     }
 
     createControl(b: IBinding, r?: RenderingContext): controls.IControl {
-        r = this.copyContext(r);
+        r = this.copyContext(r,true);
         var c = <IControlFactory><any>b.type();
         if (!b.get() && b.get() !== false) {
             var dv = b.type().default
@@ -352,6 +392,8 @@ export class DisplayManager {
         if ((<tps.metakeys.Reference>b.type()).reference) {
             return referenceControl(b);
         }
+        var repre = <any>b.type();
+        var representation = repre.representation;
         var groups = tps.service.propertyGroups(b.type());
         if (groups.length == 0) {
             return new controls.Label(tps.service.label(b.get(), b.type()));
@@ -366,7 +408,14 @@ export class DisplayManager {
             if (groups[0].properties.length < 6 || true) {
                 var rs: controls.Composite = <controls.Composite>this.renderGroup(b, groups[0], r, true && (!r.noStatus));
                 rs.setRenderingOptions(r);
-                var tf = groups.length <= 4 ? new forms.TabFolder() : new controls.HorizontalTabFolder("div");
+
+                var tf:controls.Composite = groups.length <= 4 ? new forms.TabFolder() : new controls.HorizontalTabFolder("div");
+                var headers=false;
+                if (representation=="inline"){
+                    headers=true;
+                    tf=new controls.VerticalFlex();
+                    tf._style.flex="0 0 auto";
+                }
                 tf._style.padding = "5px";
                 for (var i = 1; i < groups.length; i++) {
                     var cm = ro.clone(r, {noStatus: true, noStatusDecorations: true, noMargin: true})
@@ -378,6 +427,9 @@ export class DisplayManager {
                             ss = vv;
                         }
 
+                    }
+                    if (headers){
+                        tf.addHTML("<h4>"+ss.title()+"</h4>")
                     }
                     tf.add(ss);
                 }
@@ -391,7 +443,7 @@ export class DisplayManager {
         // return null;
     }
 
-    private copyContext(r: RenderingContext) {
+    private copyContext(r: RenderingContext,incLevel:boolean) {
         var dfo = ro.defaultOptions();
         Object.keys(dfo).forEach(x => {
             if (r[x] == undefined) {
@@ -405,6 +457,9 @@ export class DisplayManager {
         }
         else {
             r = {};
+        }
+        if (incLevel) {
+            r.level = r.level ? r.level + 1 : 1;
         }
         return r;
     }
@@ -436,7 +491,7 @@ export class DisplayManager {
         }
 
         g.properties.forEach(x => {
-            var o = this.copyContext(r);
+            var o = this.copyContext(r,false);
             o.dialog = false;
             o.noStatus = true;
             result.add(this.createControl(b.binding(x.id), o));

@@ -10,6 +10,8 @@ export interface RenderingOptions{
     noStatusDecorations?:boolean
     noMargin?: boolean
     kind?: string
+    maxValuesForRadio?: number
+    level?: number
 }
 
 export function defaultOptions():RenderingOptions{

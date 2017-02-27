@@ -165,22 +165,52 @@ export class SetBindingValueAction implements IContributionItem,tp.IValueListene
 
     valueChanged(e){
         this.checked=this.b.get()==this.val||(!this.b.get()&&this.val==this.b.type().default);
+        if (tp.service.isArray(this.b.type())){
+            this.checked=this.b.collectionBinding().contains(this.val);
+        }
     }
 
     run(){
-
-        this.b.set(this.val);
+        if (tp.service.isArray(this.b.type())){
+            var cnt=this.b.collectionBinding().workingCopy();
+            if (this.b.collectionBinding().contains(this.val)){
+                this.b.set([].concat(this.b.get()).filter(x=>x!=this.val))
+                this.checked=false;
+            }
+            else{
+                //this.b.add(this.val);
+                this.checked=true;
+                var vl=this.b.get();
+                if (!vl){
+                    vl=[];
+                }
+                this.b.set([this.val].concat(vl))
+            }
+        }
+        else {
+            if (this.b.get() == this.val) {
+                this.b.set(null);
+                this.checked=false;
+            }
+            else {
+                this.b.set(this.val);
+                this.checked=true;
+            }
+        }
         this.valueChanged(null)
     }
 }
 export class ValuesMenu implements IContributionItem{
-
+    id: string
     title: string
     items:IContributionItem[];
+    image: string
     bnd: Binding
     transform:(x:any)=>any
     constructor(private b:Binding){
+
         this.title=tp.service.caption(b.type());
+        this.id=b.id();
         var en=tp.enumOptions(b.type(),b);
         if (!en||en.length==0){
             var bnd=tp.enumOptionsBinding(b.type(),b);
@@ -198,8 +228,8 @@ export class ValuesMenu implements IContributionItem{
     valueChanged(e){
         if (this.bnd) {
             this.items = this.bnd.collectionBinding().workingCopy().map(x => new SetBindingValueAction(this.b, this.transform?this.transform(x):x,tp.service.label(x,this.bnd.collectionBinding().componentType())));
-            if (!this.bnd.type().required){
-                this.items.push(new SetBindingValueAction(this.b,null,"None"))//
+            if (this.bnd.isLoading()){
+                this.items.push({ title:"Loading...", disabled: true})//
             }
         }
     }

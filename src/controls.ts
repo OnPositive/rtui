@@ -23,6 +23,7 @@ export interface IControl {
 export interface IContributionItem {
     id?: string
     title?: string
+
     link?: string
     image?: string
     disabled?: boolean
