@@ -1,5 +1,7 @@
 #Types UI
 
+##Disclaimer this readme is a partially joke, and contains a lot of hype
+
 Little has changed in the business application UI development since ... release. 
 
 Technologies have changed (GXT, Angular, React, etc.), but fundamentals remain the same.  The developer must choose which components to use, how to lay those components out, how to store the data being edited and how to synchronize the model with the UI. Even the best developers fall into traps of having UI components talk directly to other UI components rather than through the model. Inordinate amount of time is spent debugging layout and data-binding issues.
