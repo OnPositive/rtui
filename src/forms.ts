@@ -2010,7 +2010,7 @@ export class FullRenderList extends BasicListControl {
 
     constructor() {
         super();
-        this._style.flex="0 0";
+        this._style.flex="0 0 auto";
     }
     createNothingContent(){
         return new Composite("span");
