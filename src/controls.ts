@@ -1,6 +1,6 @@
 import {IValueListener, Binding} from "raml-type-bindings";
 import ro=require("./renderingOptions")
-
+import layout=require("./layout")
 declare var require: any
 require("../lib/bootstrap-treeview")
 export interface IControl {
@@ -156,6 +156,7 @@ export interface HasChildValidnessDecorations {
 export abstract class AbstractComposite implements IControl {
 
     private _title: string;
+    _style: CSSStyleDeclaration = <CSSStyleDeclaration>{}
 
     children: IControl[] = []
     parent: AbstractComposite;
@@ -227,6 +228,7 @@ export abstract class AbstractComposite implements IControl {
 
     render(e: Element) {
         this._element = e;
+
         return this.innerRender(e);
     }
 
@@ -295,6 +297,13 @@ export class Composite extends AbstractComposite {
     constructor(private tagName: string) {
         super()
     }
+    setSelectionVisible(sel:boolean){
+        this.children.forEach(x=>{
+            if (x instanceof Composite){
+                x.setSelectionVisible(sel);
+            }
+        })
+    }
     protected disabled:boolean=false;
      _rendersLabel:boolean
     rendersLabel(c:IControl){
@@ -360,7 +369,6 @@ export class Composite extends AbstractComposite {
     onDetach(e:Element){
         this.lifecycle.forEach(x=>x.detached(this,e))
     }
-    _style: CSSStyleDeclaration = <CSSStyleDeclaration>{}
 
     _styleString: string;
 
@@ -410,6 +418,9 @@ export class Composite extends AbstractComposite {
 
     protected innerRender(e: Element) {
         var ch = document.createElement(this.tag())
+        if (!this.parent){
+            layout.adjustLayout(this);
+        }
         e.appendChild(ch);
 
         this._element=ch;
@@ -574,11 +585,14 @@ export class HorizontalFlex extends Composite {
     }
 
     protected wrap(p: HTMLElement,c?: IControl) {
-        if (c instanceof Composite){
+        if (c instanceof Composite&&!(c instanceof InputGroup)){
             return p;
         }
         var d = document.createElement("div");
         copyProps(this.wrapStyle, d.style);
+        if (c instanceof InputGroup){
+            d.style.flex=c._style.flex;
+        }
         p.appendChild(d);
         return d;
     }
@@ -718,7 +732,22 @@ export class ErrorMessage extends AbstractComposite{
         </div>`
     }
 }
+export class AccorditionContainer extends VerticalFlex{
+    acc:Accordition=new Accordition();
 
+    constructor(){
+        super();
+        this.acc._style.flex="1 1 0";
+        this.acc.parent=this;
+        this.children.push(this.acc)
+        this._style.overflow="hidden"
+        this.wrapStyle.display="flex";
+    }
+
+    add(c:IControl){
+        this.acc.add(c);
+    }
+}
 export class Accordition extends AbstractComposite {
 
     public expand(c: IControl) {
@@ -733,7 +762,7 @@ export class Accordition extends AbstractComposite {
     }
 
     getSelectedTitle() {
-        if (this.selectedIndex != undefined) {
+        if (this.selectedIndex != undefined) {//
             return this.children[this.selectedIndex].title();
         }
     }
@@ -749,6 +778,10 @@ export class Accordition extends AbstractComposite {
         var bids = this.bids;
         var gids = this.gids;
         this.selectedIndex = index;
+        var c=this.children[index];
+        if (c instanceof Composite){
+            c.potentiallyVisible();
+        }
         for (var j = 0; j < bids.length; j++) {
             if (j != index) {
                 if (document.getElementById(bids[j])) {
@@ -799,12 +832,14 @@ export class Accordition extends AbstractComposite {
     private gids: string[]
     private headings: string[]
 
-    protected innerRender(e: Element) {
+    protected innerRender(e: HTMLElement) {
         var topId = nextId();
-
         var templates: string[] = []
         var headings: string[] = []
         this.headings = headings;
+        if (this._style) {
+            copyProps(this._style, e.style);
+        }
         var bids: string[] = []
         var gids: string[] = []
         for (var i = 0; i < this.children.length; i++) {
@@ -815,6 +850,8 @@ export class Accordition extends AbstractComposite {
             bids.push(elId)
             headings.push(hId)
             gids.push(gid)
+            var hh=`<div class="panel-body" style="background: red;flex: 1 1"><div id="${bid}" style="background: green;"></div></div>`;
+            var isComposite=this.children[i] instanceof Composite;//
             var styleExpanded = i == 0 ? "flex: 1 1 0" : "display: none";
             var expanded = i == 0;
             var s = `<div id="${gid}" class="panel panel-default" style="margin: 0px;${styleExpanded}; display: flex;flex-direction: column">
@@ -822,13 +859,14 @@ export class Accordition extends AbstractComposite {
                 <h4 class="panel-title" style="display: inline;cursor: pointer"><a>${this.children[i].title()}</a></h4>
                 <div style="float: right" id="${"T" + hId}"></div>
             </div>
-            <div id="${elId}"  style="flex: 1 1 auto;display: flex;flex-direction: column;${styleExpanded}">
-            <div class="panel-body" style="background: red;flex: 1 1"><div id="${bid}" style="background: green;"></div></div>
+            
+            <div id="${elId}"  style="flex: 1 1 auto;display: flex;overflow:auto;flex-direction: column;${styleExpanded}">       
+                ${isComposite?"":hh}
             </div>
            </div>`;
             templates.push(s);
         }
-        var content = `<div class="panel-group" id="${topId}" style="margin: 0;padding: 0;display: flex;flex-direction: column;flex: 1 1 auto; height: 100%">
+        var content = `<div class="panel-group" id="${topId}" style="margin: 0;padding: 0;display: flex;flex-direction: column;flex: 1 1 auto;">
              ${templates.join('')}       
         </div>`
         e.innerHTML = content;
@@ -915,6 +953,7 @@ if (!window.observer) {
 }
 import forms=require("./forms")
 import tps=require("raml-type-bindings")
+import {InputGroup} from "./forms";
 
 
 var entityMap = {
@@ -983,6 +1022,9 @@ export class HorizontalTabFolder extends Composite {
 
     rendersLabel(c:IControl){
         return true;
+    }
+    constructor(cntrl:string="div"){
+        super(cntrl);
     }
 
     setChildValidness(validness:boolean[]){

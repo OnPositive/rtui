@@ -1005,7 +1005,7 @@ export class NavBar implements controls.IControl {
                     </a>
                 </a>
             </div>
-            
+         
             <div class="navbar-right">
                 <ul class="nav navbar-nav" id="${id}"></ul>
                 ${this._theme.brandRight}

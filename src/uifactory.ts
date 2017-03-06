@@ -9,6 +9,7 @@ import IPropertyGroup=tps.ts.IPropertyGroup;
 import {RadioSelect, StatusRender} from "./forms";
 import {Binding} from "raml-type-bindings";
 import {Label, Composite} from "./controls";
+import rm=require("./representationManager")
 
 declare const marked: any
 
@@ -35,6 +36,17 @@ const BooleanControlFactory: IControlFactory = {
             s.add(h);
             return s;
         }
+        return rs;
+    }
+}
+
+
+const ActionControlFactory: IControlFactory = {
+
+    createControl(b: IBinding, r?: RenderingContext){
+        var rs = new forms.BindedButton();
+        rs._binding = b
+
         return rs;
     }
 }
@@ -79,6 +91,7 @@ const URLControlFactory: IControlFactory={
     }
 }
 tps.declareMeta(tps.TYPE_URL, URLControlFactory);
+tps.declareMeta(tps.TYPE_ACTION, ActionControlFactory);
 
 tps.declareMeta(tps.TYPE_UNION, UnionControlFactory);
 tps.declareMeta(tps.TYPE_BOOLEAN, BooleanControlFactory);
@@ -88,10 +101,14 @@ const StringControlFactory: IControlFactory = {
         if ((<tps.metakeys.Reference>b.type()).reference) {
             return referenceControl(b);
         }
+        var repre = <any>b.type();
+
+        var representation = repre.representation;
+
         if (!b.accessControl().canEditSelf()) {
             var hh=tps.service.isSubtypeOf(b.type(),tps.TYPE_CODE);
             if (hh){
-                var mmm=new forms.BindedCode("div");
+                var mmm=new forms.BindedCode();
                 mmm._binding=b;
                 return mmm; //
             }
@@ -127,7 +144,7 @@ const StringControlFactory: IControlFactory = {
                 if (mv===null||mv===undefined){
                     mv=6;
                 }
-                if (mm.enum.length < mv && rc.kind != "filter") {
+                if (representation=="radio"||(mm.enum.length < mv && rc.kind != "filter"&&representation!="select")) {
                     var res = new RadioSelect()
                     res._binding = b;
                     return res;
@@ -172,12 +189,14 @@ const StringControlFactory: IControlFactory = {
     }
 }
 
-const ArrayControlFactory: IControlFactory = {
-    createControl(b: IBinding, rc?: RenderingContext){
+export function createList(b: IBinding, rc?: RenderingContext,rep?:any){
+        var repre = <any>b.type();
+        var representation = rep?rep:repre.representation;
         var r = new forms.Section(b.type().displayName, true);
 
         var params = (<tps.Operation>b.type()).parameters;
         var menuOnlyItems=[]
+
         var contributors:forms.MenuContributor[]=[]
         if (b instanceof tps.ViewBinding) {
             var ps = b.parameterBindings();
@@ -222,12 +241,26 @@ const ArrayControlFactory: IControlFactory = {
                 cmm.add(bm)
                 return cmm;
             }
+            //var vals=forms.enumValues(b.collectionBinding().componentType());
+            if (true){
+
+                    var cl = new tps.Binding("");
+                    cl.value = forms.enumOptions(ct, b);
+                    cl._type = b.type();
+                bm._binding = cl;
+                tps.bidirectional(b, cl,null,null);//
+                var cmm = new controls.Composite("span")
+                cmm.setTitle(tps.service.caption(b.type()));
+                bm.setTitle(tps.service.caption(b.type()));
+                cmm.add(bm)
+                return cmm;
+
+            }
         }
         r.setDescription(b.type().description)
         var lst: forms.AbstractListControl = new forms.SimpleListControl();
         var props = tps.service.visibleProperties(b.collectionBinding().componentType());
-        var repre = <any>b.type();
-        var representation = repre.representation;
+
         if (representation=="elements"){
             var result=new forms.FullRenderList();
             result._binding=b;
@@ -267,7 +300,7 @@ const ArrayControlFactory: IControlFactory = {
         let v = (v: boolean) => {
             r.setVisible(v)
         };
-        if (representation != "list-only" && representation != "table-only" && props.length > 1 && (rc.maxMasterDetailsLevel > 0)) {
+        if (representation != "list-only" && representation != "table-only" && ((props.length > 2&&representation!="list")||(props.length>1&&representation=="list")) && (rc.maxMasterDetailsLevel > 0)) {
 
             var md = new forms.MasterDetails(lst);
             r.body._style.padding = "0px";//
@@ -281,6 +314,12 @@ const ArrayControlFactory: IControlFactory = {
         }
 
         return r;
+
+}
+
+const ArrayControlFactory: IControlFactory = {
+    createControl(b: IBinding, rc?: RenderingContext){
+        return createList(b,rc,null);
     }
 }
 
@@ -362,6 +401,8 @@ function referenceControl(b: IBinding) {
 }
 export class DisplayManager {
 
+    manager=new rm.RepresentationProcessor();
+
     createOperationControl(op: tps.Operation, r?: RenderingContext): controls.IControl {
         return new controls.Label(op.displayName);
     }
@@ -394,6 +435,24 @@ export class DisplayManager {
         }
         var repre = <any>b.type();
         var representation = repre.representation;
+        if (representation&&typeof representation=="object"){
+            var flx=new controls.VerticalFlex();
+            let rnd = new forms.StatusRender();
+            if (!r.noStatus){
+                if (r.noStatus) {
+                    rnd.displayMessage = false;
+                }
+                if (r.noStatusDecorations) {
+                    rnd.displayDecorations = false;
+                }
+                rnd._binding = b;
+                flx.add(rnd)
+            }
+            flx._style.flex="1 1 auto";
+            var mm=this.copyContext(r,false);
+            mm.noStatus=true;
+            return this.manager.processRepresentation(b,representation,flx,mm);
+        }
         var groups = tps.service.propertyGroups(b.type());
         if (groups.length == 0) {
             return new controls.Label(tps.service.label(b.get(), b.type()));
@@ -444,6 +503,9 @@ export class DisplayManager {
     }
 
     private copyContext(r: RenderingContext,incLevel:boolean) {
+        if (!r){
+            r={}
+        }
         var dfo = ro.defaultOptions();
         Object.keys(dfo).forEach(x => {
             if (r[x] == undefined) {

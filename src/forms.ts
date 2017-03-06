@@ -5,7 +5,7 @@ import uifactory=require("./uifactory")
 import IBinding=tps.IBinding
 import IPropertyGroup=tps.ts.IPropertyGroup;
 import wb=require("./workbench");
-import {IControl, Composite, VerticalFlex, HorizontalFlex, IContributionItem} from "./controls";
+import {IControl, Composite, VerticalFlex, HorizontalFlex, IContributionItem, Accordition} from "./controls";
 import {ISelectionProvider, ISelectionListener} from "./workbench";
 import {IValueListener, ChangeEvent, Binding, Status, ViewBinding, metakeys} from "raml-type-bindings";
 import {ListenableAction} from "./actions";
@@ -1312,18 +1312,39 @@ export class Section extends controls.Composite {
     }
 
     renderContent(ch: HTMLElement) {
+        var cchh=false;
         if (this.parent instanceof TabFolder) {
             this._style.borderRadius = "0px";
             this.heading._style.borderTopWidth = "0px";
             this._style.borderTopWidth = "0px";
-        }
-        if ((this.parent instanceof TabFolder)) {
             this.heading._text = " ";
             this.heading._style.minHeight = "40px";
             this.toolbar._styleString = "float: left";
             this.heading._style.paddingLeft = "5px";
+            cchh=true;
         }
-
+        if (this.parent){
+            if (this.parent.parent==null){
+                this._style.marginRight="5px";
+                this._style.marginLeft="5px";
+            }
+        }
+        if (this.parent instanceof Accordition){
+            this._style.borderRadius = "0px";
+            //this.heading._style.borderTopWidth = "0px";
+            this._style.borderBottomWidth = "0px";
+            this._style.borderLeftWidth="0px"
+            this.heading._text = " ";
+            this.heading._style.minHeight = "40px";
+            this.toolbar._styleString = "float: left";
+            this.heading._style.paddingLeft = "5px";
+            cchh=true;
+        }
+        if (cchh){
+            if (this.toolbar.items.length==0){
+                this.heading.setVisible(false);
+            }
+        }
         super.renderContent(ch);
     }
 
@@ -1419,10 +1440,15 @@ export abstract class AbstractListControl extends BindableControl implements ISe
 
     footer: Footer;
 
+    selectionVisible:boolean=true
+
     collection() {
         return this._binding.collectionBinding();
     }
-
+    setSelectionVisible(s:boolean){
+        this.selectionVisible=s;
+        this.refresh();
+    }
     protected addIcon(v: any, td: Composite, i: number = 0) {
         var icon = tps.service.icon(v, this._binding.collectionBinding().componentType())
         if (i == 0 && icon) {
@@ -1814,6 +1840,8 @@ export abstract class AbstractListControl extends BindableControl implements ISe
 }
 import uif=require("./uifactory")
 import moment = require("moment");
+
+
 export abstract class BasicListControl extends AbstractListControl {
 
     layoutToControl(c: controls.Composite, l: tps.decorators.LayoutElement, num: number) {
@@ -1839,6 +1867,19 @@ export abstract class BasicListControl extends AbstractListControl {
             else if (l.role) {
                 c._className = l.role;
             }
+            if ((<any>l).action){
+                c.onClick=x=>{
+                    var obj=this.collection().workingCopy()[num];
+                    const bnds=new Binding("");
+                    bnds.value=obj;//
+                    bnds._type=this.collection().componentType();
+                    bnds.context=this._binding
+                    tps.calcExpression((<any>l).action,bnds,false);
+
+                }
+                //c._className="btn"
+            }
+
             if (l.background) {
                 c._style.background = l.background;
                 if (!l.color) {
@@ -1971,7 +2012,7 @@ export class SimpleListControl extends BasicListControl {
         var rs = new Composite("li")
         rs.addClassName("list-group-item")
         rs.addClassName("noRoundBorder")
-        var sel=this.isSelected(v);
+        var sel=this.isSelected(v)&&this.selectionVisible;
         this.appendGroupBy(position, rs, v, sel);
         if (position == 0) {
             rs._style.borderTopWidth = "0px";
@@ -2011,6 +2052,7 @@ export class FullRenderList extends BasicListControl {
     constructor() {
         super();
         this._style.flex="0 0 auto";
+
     }
     createNothingContent(){
         return new Composite("span");
@@ -2318,7 +2360,7 @@ export class TableControl extends BasicListControl {
         rs._style.display = "flex";
         rs._style.flexDirection = "row";
         var ps = this.columnProps();
-        var sel = this.isSelected(v);
+        var sel=this.isSelected(v)&&this.selectionVisible;
         rs.addClassName("noRoundBorder");
         rs.addClassName("list-group-item")
 
@@ -2610,6 +2652,9 @@ export class BindedImage extends BindedReadonly {
     constructor(){
         super("span")
     }
+    height: number=150;
+
+
     renderContent(c: HTMLElement) {
         super.renderContent(c);
         if (this._binding) {
@@ -2620,9 +2665,21 @@ export class BindedImage extends BindedReadonly {
                 cnt = "<span class='fieldCaption' style='display: inline'>" + this.title() + ":</span><span class='fieldValue' style='margin-left: 5px'>" + cnt + "</span>";
             } //
             if (vl) {
-                c.innerHTML = `<img height="150px" src="${vl}"></img>`;
+                c.innerHTML = `<img height="${this.height}" src="${vl}"></img>`;
             }
         }
+    }
+}
+export class BindedIcon extends BindedImage{
+    constructor(){
+        super();
+        this.height=24;
+    }
+}
+export class Thumbnail extends BindedImage{
+    constructor(){
+        super();
+        this.height=64;
     }
 }
 export class BindedFrame extends BindedReadonly {
@@ -2684,6 +2741,7 @@ export class BindedLabel extends BindedReadonly {
         super.onAttach(x);
     }
 
+
     renderContent(c: HTMLElement) {
         super.renderContent(c);
         if (this._binding) {
@@ -2716,6 +2774,87 @@ export class BindedLabel extends BindedReadonly {
                 cnt = "<span class='fieldCaption' style='display: inline'>" + this.title() + ":</span><span class='fieldValue' style='margin-left: 5px'>" + cnt + "</span>";
             }
 
+            c.innerHTML = `<span style="padding: 4px">${cnt}</span>`;
+        }
+    }
+}
+export class BindedHeader extends BindedReadonly{
+
+    constructor(level=3){
+        super("h"+level)
+    }
+    renderContent(c: HTMLElement) {
+        super.renderContent(c);
+        if (this._binding) {
+            var vl = this._binding.get();
+
+            var cnt = tps.service.label(vl, this._binding.type());
+            if (!(<tps.metakeys.Label>this._binding.type()).htmlLabel&&!tps.service.isSubtypeOf(this._binding.type(),tps.TYPE_HTML)) {
+                cnt = controls.escapeHtml(cnt);
+            }
+            c.innerHTML = `<span style="padding: 4px">${cnt}</span>`;
+        }
+    }
+}
+export class AlignedContainer extends Composite{
+
+    fl:HorizontalFlex=new HorizontalFlex();
+
+    constructor(right:boolean=true){
+        super("div")
+        if (right){
+            this.fl._style.cssFloat="right";
+        }
+        else{
+            this.fl._style.cssFloat="left";
+        }
+        this.children.push(this.fl);
+        this.fl.parent=this;
+    }
+    add(c:IControl){
+        this.fl.add(c);
+    }
+    remove(c:IControl){
+        this.fl.remove(c);
+    }
+
+}
+export class BindedButton extends BindedReadonly{
+    constructor(){
+        super("button")
+        this.addClassName("btn");
+        this.addClassName("btn-default")
+        this._style.margin="5px";
+
+    }
+    renderContent(c: HTMLElement) {
+        super.renderContent(c);
+        if (this._binding) {
+            c.innerText=tps.service.caption(this._binding.type());
+            c.onclick=(x)=>{
+                var exp=this._binding.type().body;
+                tps.calcExpression(exp,this._binding,false);
+                this._binding.root().refresh();
+                //console.log("Clicked");
+            }
+        }
+    }
+}
+export class Interpolator extends BindedReadonly{
+
+    label: string
+    constructor(level=3){
+        super("span")
+    }
+    renderContent(c: HTMLElement) {
+        super.renderContent(c);
+        if (this._binding) {
+            var vl = this._binding.get();
+
+            var cnt = tps.ts.interpolate(this.label,vl, this._binding.type());
+            if (!(<tps.metakeys.Label>this._binding.type()).htmlLabel&&!tps.service.isSubtypeOf(this._binding.type(),tps.TYPE_HTML)) {
+                cnt = controls.escapeHtml(cnt);
+            }
             c.innerHTML = `<span style="padding: 4px">${cnt}</span>`;
         }
     }

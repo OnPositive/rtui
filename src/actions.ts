@@ -305,3 +305,11 @@ export class DeleteAction extends CollectionAction{
         return "Remove";
     }
 }
+
+var w:any=window;
+var ct:Binding;
+w.open=function(title:string,arg:Binding){
+    dialog(title,arg,()=>{
+
+    });
+}
