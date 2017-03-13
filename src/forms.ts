@@ -10,59 +10,9 @@ import {ISelectionProvider, ISelectionListener} from "./workbench";
 import {IValueListener, ChangeEvent, Binding, Status, ViewBinding, metakeys} from "raml-type-bindings";
 import {ListenableAction} from "./actions";
 import auth=require("./auth")
-
+import ex=require("./extraCss")
 var sheet = document.createElement('style')
-sheet.innerHTML = `.tab-content>.active.grabVertical {
-display: flex;
-flex: 1 1 auto;
-}
-.active{
-z-index: 0; 
-}
-.pagination>.active>a, .pagination>.active>a:focus, .pagination>.active>a:hover, .pagination>.active>span, .pagination>.active>span:focus, .pagination>.active>span:hover {
-z-index: 0;
-}
-.list-group-item.active, .list-group-item.active:focus, .list-group-item.active:hover  {
-    z-index: 0;
-}
-.list-group-item.active  .details {
-    color: white
-}
-.list-group-item.active  a {
-    color: white
-}
-.details {
-    color: gray;
-    margin-left: 22px;
-}
-.list-group-item.noRoundBorder {
-    border-left-width: 0px;
-    border-right-width: 0px;
-    
-}
-.list-group-item.noRoundBorder:first-child {
-    border-top-left-radius: 0px;
-    border-top-right-radius: 0px;
-}
-.list-group-item.noRoundBorder:last-child {
-    border-bottom-left-radius: 0px;
-    border-bottom-right-radius: 0px;
-}
-.glyphicon-refresh-animate {
-    -animation: spin .7s infinite linear;
-    -webkit-animation: spin2 .7s infinite linear;
-}
-
-@-webkit-keyframes spin2 {
-    from { -webkit-transform: rotate(0deg);}
-    to { -webkit-transform: rotate(360deg);}
-}
-
-@keyframes spin {
-    from { transform: scale(1) rotate(0deg);}
-    to { transform: scale(1) rotate(360deg);}
-}
-`;
+sheet.innerHTML =ex;
 document.body.appendChild(sheet);
 const ERROR = `<span class="alert-danger" style="background-color: transparent" role="alert">
         <span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span> </span>`
@@ -2832,7 +2782,7 @@ export class BindedButton extends BindedReadonly{
         if (this._binding) {
             c.innerText=tps.service.caption(this._binding.type());
             c.onclick=(x)=>{
-                var exp=this._binding.type().body;
+                var exp=(<any>this._binding.type()).body;
                 tps.calcExpression(exp,this._binding,false);
                 this._binding.root().refresh();
                 //console.log("Clicked");

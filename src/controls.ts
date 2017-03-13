@@ -1,8 +1,14 @@
 import {IValueListener, Binding} from "raml-type-bindings";
 import ro=require("./renderingOptions")
-import layout=require("./layout")
 declare var require: any
-require("../lib/bootstrap-treeview")
+
+import layout=require("./layout");
+var jquery=require("jquery")//
+window.jQuery=jquery
+window.$=jquery;
+require("../lib/bootstrap-treeview") //
+
+
 export interface IControl {
     render(e: Element);
     dispose?();
@@ -974,12 +980,11 @@ export function escapeHtml (string) {
 }
 export class SourceCode extends Composite{
 
-    _content:string;
-    _language: string="javascript";
     _editable: boolean=false;
 
-    constructor(){
+    constructor(title: string="",public _language:string="javascript",public _content: string=""){
         super("pre")
+        this.setTitle(title);
     }
     setContent(c:string){
         this._content=c;

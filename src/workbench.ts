@@ -30,6 +30,17 @@ declare var require: any
 
 var Split: (a, b) => void = require("../lib/Split").Split
 
+
+export class SimpleLabelProvider implements ILabelProvider{
+
+    constructor(private image:string,private tlabel:string){
+
+    }
+
+    label(v:any){
+        return `<img src="${this.image}"></img>`+v[this.tlabel];
+    }
+}
 export class LayoutPart implements ILayoutPart {
 
     constructor(private _el: Element) {
@@ -283,7 +294,20 @@ var nh = {
 export abstract class ViewPart implements IWorkbenchPart, ISelectionProvider {
 
 
-    addSelectionConsumer(t: {setInput(c: any)}) {
+    addSelectionConsumer(t: ({setInput(c: any)})| ((c:any)=>void)) {
+        if (typeof t=="function"){
+            this.addSelectionListener({
+                selectionChanged(v: any[]){
+                    if (v.length > 0) {
+                        t(v[0]);
+                    }
+                    else {
+                        t(null);
+                    }
+                }
+            })
+            return;
+        }
         this.addSelectionListener({
             selectionChanged(v: any[]){
                 if (v.length > 0) {
@@ -1029,8 +1053,8 @@ export interface IViewRef {
 }
 export interface IPerspective {
 
-    title: string
-    actions: IContributionItem[];
+    title?: string
+    actions?: IContributionItem[];
     views: IViewRef[ ]
 
     onOpen?: () => void
@@ -1054,7 +1078,9 @@ export class Application implements controls.IControl {
 
     constructor(private _title: string, private initialPerspective: IPerspective, element?: Element|string, currentP?: IPerspective, theme?: INavBarTheme) {
         this.perspective = currentP ? currentP : initialPerspective;
-        this.perspective.actions.forEach(a => this.nb.getMenuBar().add(a))
+        if(this.perspective.actions) {
+            this.perspective.actions.forEach(a => this.nb.getMenuBar().add(a))
+        }
         if (element) {
             if (typeof element == "string") {
                 this.render(document.getElementById(<string>element))
