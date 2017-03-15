@@ -1,12 +1,13 @@
 {
   "name": "types-ui",
-  "version": "0.0.6",
+  "version": "0.0.8",
   "private": false,
   "main": "dist/main.js",
   "typings": "./dist/main.d.ts",
   "scripts": {
     "compile": "rm -rf dist/ && ./node_modules/typescript/bin/tsc",
     "build": "npm run compile",
+    "packageMin":"browserify ./dist/main.js -o  --standalone RC | uglifyjs > rc.min.js",
     "start": "budo ./dist/demo.js  --serve bundle.js --live"
   },
   "devDependencies": {
@@ -20,7 +21,7 @@
     "javascript-detect-element-resize": "^0.5.3",
     "jquery": "^3.1.1",
     "moment": "^2.17.1",
-    "raml-type-bindings": "0.0.7"
+    "raml-type-bindings": "0.0.8"
   },
   "directories": [
     "dist"

@@ -1,6 +1,7 @@
+import {Binding} from "raml-type-bindings";
 declare function require(c:any):any
 require("headjs/dist/1.0.0/head.js")
-import rtb=require("raml-type-bindings")
+export import rtb=require("raml-type-bindings")
 import display=require("./uifactory");
 export import wb=require("./workbench");
 export import controls=require("./controls")
@@ -53,12 +54,35 @@ export function prepare(f:()=>void){
     })
 }
 
-export function render(el:HTMLElement, b:rtb.Binding,o:{}){
+export function render(el:HTMLElement, b:rtb.Binding|rtb.Type,o:{},r?:any):rtb.Binding{
+    var tr:Binding;
+    var options=r?r:o;
+    if (!(b instanceof rtb.Binding)) {
+        tr=rtb.binding(o,b);
+    }
+    else{
+        tr=b;
+    }
     prepare(()=>{
-        var control = display.service.createControl(b, o);
-        control.render(el);
+            var control = display.service.createControl(tr, options);
+            control.render(el);
+
+
     })
+    return tr;
 }
+export function control( b:rtb.Binding|rtb.Type,o:{},r?:any){
+        if (b instanceof rtb.Binding) {
+            var control = display.service.createControl(b, o);
+            return control
+        }
+        else{
+            var bnd=rtb.binding(o,b);
+            var control = display.service.createControl(bnd, r);
+            return control;
+        }
+}
+
 
 export function simpleListView(title: string,value:any[],icon:string,labelField:string){
     let result=new wb.TreeView(title,title);
