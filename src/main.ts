@@ -54,6 +54,12 @@ export function prepare(f:()=>void){
     })
 }
 
+export function register(t:{ types:{ [name:string]:any}}){
+    Object.keys(t.types).forEach(x=>{
+        rtb.service.register(t.types[x]);
+    })
+}
+
 export function render(el:HTMLElement, b:rtb.Binding|rtb.Type,o:{},r?:any):rtb.Binding{
     var tr:Binding;
     var options=r?r:o;
