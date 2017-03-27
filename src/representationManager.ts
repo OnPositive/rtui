@@ -60,6 +60,7 @@ export class RepresentationProcessor{
         this.registry.bindable["inline"]=true;
         this.registry.bindable["h1"]=true;
         this.registry.bindable["h2"]=true;
+        this.registry.bindable["h3"]=true;
         this.registry.bindable["h4"]=true;
         this.registry.bindable["h5"]=true;
         this.registry.bindable["label"]=true;//

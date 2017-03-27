@@ -415,6 +415,18 @@ export class DisplayManager {
             if (dv) {
                 b.set(dv);
             }
+            if (b.type().required) {
+                if (tps.service.isArray(b.type())){
+                    b.set([]);
+                }
+                else if (tps.service.isMap(b.type())){
+                    b.set({});
+                }
+                else if (tps.service.isObject(b.type())){
+                    b.set(tps.service.newInstance(b.type()));
+                }
+            }
+
         }
 
         if (c.createControl) {
