@@ -2832,7 +2832,7 @@ export class BindedButton extends BindedReadonly{
         if (this._binding) {
             c.innerText=tps.service.caption(this._binding.type());
             c.onclick=(x)=>{
-                var exp=this._binding.type().body;
+                var exp=(<any>this._binding.type()).body;
                 tps.calcExpression(exp,this._binding,false);
                 this._binding.root().refresh();
                 //console.log("Clicked");
