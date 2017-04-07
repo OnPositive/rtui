@@ -77,6 +77,61 @@ export function render(el:HTMLElement, b:rtb.Binding|rtb.Type,o:{},r?:any):rtb.B
     })
     return tr;
 }
+export function poll(m:rtb.Operation,interval:number=500):rtb.OperationBinding{
+
+    var b=new rtb.OperationBinding(m,new Binding(""));
+    setInterval(()=>
+        b.execute(v=>{
+            b.value=v;
+            b.changed();
+        })
+    ,interval);
+    return b;
+}
+
+export function item(getOperation:rtb.Operation,updateOperation:rtb.Operation): rtb.Binding&{ connect():void,setContext(v:any)}{
+    var result=rtb.binding("",getOperation.result);
+    var update=new rtb.OperationBinding(updateOperation,result);
+    var get=new rtb.OperationBinding(getOperation,result);
+    var changing=false;
+
+    (<any>result).connect=()=>{
+        get.execute(x=>{
+            try {
+                changing=true;
+                result.set(x);
+            } finally {
+                changing=false;
+            }
+        })
+    }
+
+
+    (<any>result).setContext=(v)=>{
+        Object.keys(v).forEach(x=>{result.addVar(x,v[x])})
+        get.execute(x=>{
+            try {
+                changing=true;
+                result.set(x);
+            } finally {
+                changing=false;
+            }
+        })
+    }
+
+    result.addListener(x=>{
+        if (changing){
+            return;
+        }
+        var vl=result.get();
+        update.setContext({"application/json":vl})
+        update.execute(x=>{
+
+        })
+    })
+    return <any>result;
+}
+
 export function control( b:rtb.Binding|rtb.Type,o:{},r?:any){
         if (b instanceof rtb.Binding) {
             var control = display.service.createControl(b, o);
@@ -121,3 +176,4 @@ export import ViewPart=wb.ViewPart;
 export import IPerspective=wb.IPerspective;
 export import Application=wb.Application;
 export import Relation=wb.Relation;
+

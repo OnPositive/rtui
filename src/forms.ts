@@ -352,6 +352,9 @@ export class BindableComposite extends BindableControl {
                 let cachingBinding = new tps.CachingBinding(<tps.Binding>this._binding);
                 this.pb = cachingBinding;
                 footer = new ApplyRevertComposite(cachingBinding);
+                if (this.getRenderingOptions().maxMasterDetailsLevel==0){
+                    footer.setVisible(false);
+                }
             }
             else {
                 this.pb = (<tps.Binding>this._binding);
@@ -985,11 +988,17 @@ export class MasterDetails extends controls.HorizontalFlex {
                             if (vl&&!Array.isArray(vl)) {
                                 Object.keys(x).forEach(k=>{
                                     vl[k]=x[k];
-                                    (<tps.Binding>bnd).refreshChildren();
+                                    (<tps.Binding>bnd).binding(k).refresh();
                                 })
                             }
                         }
+                        if ((<any>bnd).$cach){
 
+                            (<any>bnd).$cach.ol.valueChanged();
+                        }
+                        else{
+                            //(<any>bnd).set(tps.utils.deepCopy(bnd.get()))
+                        }
                     })
                 }
             })
