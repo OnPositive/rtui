@@ -1,6 +1,6 @@
-#Types UI
+# Types UI
 
-###Disclaimer this readme is a partially joke, and contains a lot of hype. (It is written basing on the one in Saphire(framework which I used for inspiration)
+### Disclaimer this readme is a partially joke, and contains a lot of hype. (It is written basing on the one in Saphire(framework which I used for inspiration)
 
 Little has changed in the business application UI development since ... release. 
 
@@ -18,20 +18,20 @@ This fundamentally changes the way developers interact with a UI framework. Inst
 
 When using widget toolkits like GXT, the developer says "create label, create text box, lay them out like so, configure their settings, setup data binding and so on". By the time the developer is done, it is hard to see the original goal in the code that's produced. This results in UI that is inconsistent, brittle and difficult to maintain.
 
-##First, The Model
+## First, The Model
 
 Describe semantics of the data that UI will edit using RAML annotations
 
 
 
-##Layer Models
+## Layer Models
 
 
 Combine information from multiple models into an integrated model. Bring together information from many files.
 
 
 
-##Stuff to Forget About
+## Stuff to Forget About
 
 
 Start making a list of stuff that you can now forget about...
@@ -41,11 +41,11 @@ data binding
 etc…
 
 
-##Other UI Toolkits
+## Other UI Toolkits
 
 Currently only Bootstrap presentation is available, but Types UI definitions are not tied to a particular toolkit. Other presentations such as React, GXT, Vaadin are possible in the future either from this project directly or from adopters.
 
 
-##Next, The UI
+## Next, The UI
 
 Describe how to present the model in UI in via a simple YAML file and let Types UI handle the rest. Embed Types UI anywhere you can create an HTML Element.
