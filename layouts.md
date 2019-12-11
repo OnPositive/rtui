@@ -1,9 +1,9 @@
-###Controlling UI layout
+### Controlling UI layout
 
 
-####Representations:
+#### Representations:
 
-####Collection representations:
+#### Collection representations:
 
 - `list`
 - `list-only`
@@ -12,10 +12,10 @@
 - `elements`
 - `tag-list`
 
-####Other representations:
+#### Other representations:
 
 
-####Layout containers:
+#### Layout containers:
 
 At this moment framework supports following layout containers:
 
